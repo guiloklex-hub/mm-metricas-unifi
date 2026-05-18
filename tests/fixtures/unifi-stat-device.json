@@ -1,0 +1,111 @@
+{
+  "meta": { "rc": "ok" },
+  "data": [
+    {
+      "_id": "60c1a2b3c4d5e6f700000001",
+      "mac": "AA:BB:CC:11:22:33",
+      "name": "AP-Loja-01",
+      "model": "U6-Pro",
+      "type": "uap",
+      "site_id": "default",
+      "uptime": 123456,
+      "tx_bytes": 12345678900,
+      "rx_bytes": 9876543210,
+      "tx_packets": 100000000,
+      "rx_packets": 80000000,
+      "tx_dropped": 1234,
+      "tx_errors": 56,
+      "tx_retries": 5400000,
+      "num_sta": 24,
+      "user-num_sta": 22,
+      "guest-num_sta": 2,
+      "radio_table_stats": [
+        {
+          "name": "wifi0",
+          "radio": "ng",
+          "channel": 6,
+          "tx_power": 17,
+          "state": "RUN",
+          "num_sta": 8,
+          "user-num_sta": 7,
+          "guest-num_sta": 1,
+          "tx_packets": 23000000,
+          "tx_retries": 1200000,
+          "tx_bytes": 3000000000,
+          "cu_self_rx": 12,
+          "cu_self_tx": 8,
+          "cu_total": 35
+        },
+        {
+          "name": "wifi1",
+          "radio": "na",
+          "channel": 36,
+          "tx_power": 20,
+          "state": "RUN",
+          "num_sta": 14,
+          "user-num_sta": 13,
+          "guest-num_sta": 1,
+          "tx_packets": 60000000,
+          "tx_retries": 3500000,
+          "tx_bytes": 7000000000,
+          "cu_self_rx": 18,
+          "cu_self_tx": 14,
+          "cu_total": 48
+        },
+        {
+          "name": "wifi2",
+          "radio": "6e",
+          "channel": 81,
+          "tx_power": 18,
+          "state": "RUN",
+          "num_sta": 2,
+          "user-num_sta": 2,
+          "guest-num_sta": 0,
+          "tx_packets": 17000000,
+          "tx_retries": 700000,
+          "tx_bytes": 2345678900,
+          "cu_self_rx": 4,
+          "cu_self_tx": 3,
+          "cu_total": 10
+        }
+      ]
+    },
+    {
+      "_id": "60c1a2b3c4d5e6f700000002",
+      "mac": "aa:bb:cc:11:22:44",
+      "name": "AP-Loja-02",
+      "model": "U6-Lite",
+      "type": "uap",
+      "site_id": "default",
+      "uptime": 234567,
+      "tx_bytes": 5432109876,
+      "tx_packets": 50000000,
+      "tx_dropped": 500,
+      "tx_errors": 22,
+      "tx_retries": 2200000,
+      "num_sta": 12,
+      "radio_table_stats": [
+        {
+          "name": "wifi0",
+          "radio": "ng",
+          "channel": 11,
+          "state": "RUN",
+          "num_sta": 5,
+          "tx_packets": 18000000,
+          "tx_retries": 900000,
+          "tx_bytes": 2200000000
+        },
+        {
+          "name": "wifi1",
+          "radio": "na",
+          "channel": 149,
+          "state": "RUN",
+          "num_sta": 7,
+          "tx_packets": 32000000,
+          "tx_retries": 1300000,
+          "tx_bytes": 3200000000
+        }
+      ]
+    }
+  ]
+}

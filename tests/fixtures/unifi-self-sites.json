@@ -1,0 +1,15 @@
+{
+  "meta": { "rc": "ok" },
+  "data": [
+    {
+      "_id": "5f1a2b3c4d5e6f7000000001",
+      "name": "default",
+      "desc": "Default"
+    },
+    {
+      "_id": "5f1a2b3c4d5e6f7000000002",
+      "name": "filial-cwb",
+      "desc": "Filial Curitiba"
+    }
+  ]
+}

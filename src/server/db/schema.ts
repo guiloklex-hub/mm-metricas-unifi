@@ -78,15 +78,20 @@ export const devices = sqliteTable(
   }),
 );
 
-/* ---------- Séries temporais ---------- */
+/* ---------- Séries temporais ----------
+ *
+ * Dimensões nullable usam sentinela `''` (string vazia) em vez de NULL para
+ * permitir uniqueness composta e ON CONFLICT (SQLite trata NULL != NULL em
+ * índices únicos). API converte ''→null no boundary.
+ */
 
 const metricsColumns = {
   ts: integer('ts').notNull(),
   controllerId: text('controller_id').notNull(),
   siteId: text('site_id').notNull(),
-  deviceId: text('device_id'),
-  radio: text('radio'),
-  clientMac: text('client_mac'),
+  deviceId: text('device_id').notNull().default(''),
+  radio: text('radio').notNull().default(''),
+  clientMac: text('client_mac').notNull().default(''),
   clientCount: integer('client_count'),
   txBytes: integer('tx_bytes'),
   txPackets: integer('tx_packets'),
@@ -104,17 +109,41 @@ const metricsColumns = {
 };
 
 export const metrics5m = sqliteTable('metrics_5m', metricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_5m_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+    t.clientMac,
+  ),
   deviceTs: index('metrics_5m_device_ts').on(t.deviceId, t.ts),
   siteTs: index('metrics_5m_site_ts').on(t.siteId, t.ts),
   clientTs: index('metrics_5m_client_ts').on(t.clientMac, t.ts),
 }));
 
 export const metrics1h = sqliteTable('metrics_1h', metricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_1h_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+    t.clientMac,
+  ),
   deviceTs: index('metrics_1h_device_ts').on(t.deviceId, t.ts),
   siteTs: index('metrics_1h_site_ts').on(t.siteId, t.ts),
 }));
 
 export const metrics1d = sqliteTable('metrics_1d', metricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_1d_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+    t.clientMac,
+  ),
   deviceTs: index('metrics_1d_device_ts').on(t.deviceId, t.ts),
   siteTs: index('metrics_1d_site_ts').on(t.siteId, t.ts),
 }));

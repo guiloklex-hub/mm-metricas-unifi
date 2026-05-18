@@ -3,32 +3,34 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import type { JobQueue } from '@server/collector/queue.ts';
 import type { DB } from '@server/db/client.ts';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import authPlugin from './plugins/auth.ts';
 import { registerErrorHandler } from './plugins/error-handler.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
+import { registerControllerRoutes } from './routes/controllers.ts';
 import { registerHealthz } from './routes/healthz.ts';
+import { registerMetricsRoutes } from './routes/metrics.ts';
+import { registerSiteRoutes } from './routes/sites.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface BuildAppOptions {
   db: DB;
+  queue: JobQueue;
   logger: FastifyBaseLogger;
   jwtSecret: string;
+  masterKey: string;
   staticDir?: string;
 }
 
-/**
- * Constrói a instância Fastify com middlewares, plugins e rotas registradas.
- * Não inicia o listen — quem chama é responsável.
- */
 export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     loggerInstance: opts.logger,
     disableRequestLogging: false,
     trustProxy: true,
-    bodyLimit: 1024 * 1024, // 1MB
+    bodyLimit: 1024 * 1024,
   });
 
   registerErrorHandler(app);
@@ -42,6 +44,13 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
 
   await registerHealthz(app);
   await registerAuthRoutes(app, opts.db);
+  await registerControllerRoutes(app, {
+    db: opts.db,
+    queue: opts.queue,
+    masterKey: opts.masterKey,
+  });
+  await registerSiteRoutes(app, opts.db);
+  await registerMetricsRoutes(app, opts.db);
 
   const staticDir = opts.staticDir ?? resolve(__dirname, '../../../dist/web');
   const hasStatic = existsSync(staticDir);
@@ -54,8 +63,6 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     });
   }
 
-  // Único notFoundHandler: APIs respondem 404 JSON; demais entregam index.html
-  // (SPA fallback) quando há build estático disponível.
   app.setNotFoundHandler(async (req, reply) => {
     if (req.url.startsWith('/api/') || req.url === '/healthz') {
       reply.status(404).send({ ok: false, error: 'not_found', path: req.url });

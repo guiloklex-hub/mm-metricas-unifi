@@ -1,0 +1,58 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parseDevicePayload — fixture realista > snapshot — payload completo do AP de loja 1`] = `
+{
+  "device": {
+    "mac": "aa:bb:cc:11:22:33",
+    "model": "U6-Pro",
+    "name": "AP-Loja-01",
+    "type": "uap",
+  },
+  "samples": [
+    {
+      "clientCount": 8,
+      "clientMac": null,
+      "deviceMac": "aa:bb:cc:11:22:33",
+      "radio": "ng",
+      "txBytes": 3000000000,
+      "txDropped": null,
+      "txErrors": null,
+      "txPackets": 23000000,
+      "txRetries": 1200000,
+    },
+    {
+      "clientCount": 14,
+      "clientMac": null,
+      "deviceMac": "aa:bb:cc:11:22:33",
+      "radio": "na",
+      "txBytes": 7000000000,
+      "txDropped": null,
+      "txErrors": null,
+      "txPackets": 60000000,
+      "txRetries": 3500000,
+    },
+    {
+      "clientCount": 2,
+      "clientMac": null,
+      "deviceMac": "aa:bb:cc:11:22:33",
+      "radio": "6e",
+      "txBytes": 2345678900,
+      "txDropped": null,
+      "txErrors": null,
+      "txPackets": 17000000,
+      "txRetries": 700000,
+    },
+    {
+      "clientCount": 24,
+      "clientMac": null,
+      "deviceMac": "aa:bb:cc:11:22:33",
+      "radio": null,
+      "txBytes": 12345678900,
+      "txDropped": 1234,
+      "txErrors": 56,
+      "txPackets": 100000000,
+      "txRetries": 5400000,
+    },
+  ],
+}
+`;

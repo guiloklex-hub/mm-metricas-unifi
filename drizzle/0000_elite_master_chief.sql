@@ -79,9 +79,9 @@ CREATE TABLE `metrics_1d` (
 	`ts` integer NOT NULL,
 	`controller_id` text NOT NULL,
 	`site_id` text NOT NULL,
-	`device_id` text,
-	`radio` text,
-	`client_mac` text,
+	`device_id` text DEFAULT '' NOT NULL,
+	`radio` text DEFAULT '' NOT NULL,
+	`client_mac` text DEFAULT '' NOT NULL,
 	`client_count` integer,
 	`tx_bytes` integer,
 	`tx_packets` integer,
@@ -98,15 +98,16 @@ CREATE TABLE `metrics_1d` (
 	`drop_rate` real
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `metrics_1d_dim_unique` ON `metrics_1d` (`ts`,`controller_id`,`site_id`,`device_id`,`radio`,`client_mac`);--> statement-breakpoint
 CREATE INDEX `metrics_1d_device_ts` ON `metrics_1d` (`device_id`,`ts`);--> statement-breakpoint
 CREATE INDEX `metrics_1d_site_ts` ON `metrics_1d` (`site_id`,`ts`);--> statement-breakpoint
 CREATE TABLE `metrics_1h` (
 	`ts` integer NOT NULL,
 	`controller_id` text NOT NULL,
 	`site_id` text NOT NULL,
-	`device_id` text,
-	`radio` text,
-	`client_mac` text,
+	`device_id` text DEFAULT '' NOT NULL,
+	`radio` text DEFAULT '' NOT NULL,
+	`client_mac` text DEFAULT '' NOT NULL,
 	`client_count` integer,
 	`tx_bytes` integer,
 	`tx_packets` integer,
@@ -123,15 +124,16 @@ CREATE TABLE `metrics_1h` (
 	`drop_rate` real
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `metrics_1h_dim_unique` ON `metrics_1h` (`ts`,`controller_id`,`site_id`,`device_id`,`radio`,`client_mac`);--> statement-breakpoint
 CREATE INDEX `metrics_1h_device_ts` ON `metrics_1h` (`device_id`,`ts`);--> statement-breakpoint
 CREATE INDEX `metrics_1h_site_ts` ON `metrics_1h` (`site_id`,`ts`);--> statement-breakpoint
 CREATE TABLE `metrics_5m` (
 	`ts` integer NOT NULL,
 	`controller_id` text NOT NULL,
 	`site_id` text NOT NULL,
-	`device_id` text,
-	`radio` text,
-	`client_mac` text,
+	`device_id` text DEFAULT '' NOT NULL,
+	`radio` text DEFAULT '' NOT NULL,
+	`client_mac` text DEFAULT '' NOT NULL,
 	`client_count` integer,
 	`tx_bytes` integer,
 	`tx_packets` integer,
@@ -148,6 +150,7 @@ CREATE TABLE `metrics_5m` (
 	`drop_rate` real
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `metrics_5m_dim_unique` ON `metrics_5m` (`ts`,`controller_id`,`site_id`,`device_id`,`radio`,`client_mac`);--> statement-breakpoint
 CREATE INDEX `metrics_5m_device_ts` ON `metrics_5m` (`device_id`,`ts`);--> statement-breakpoint
 CREATE INDEX `metrics_5m_site_ts` ON `metrics_5m` (`site_id`,`ts`);--> statement-breakpoint
 CREATE INDEX `metrics_5m_client_ts` ON `metrics_5m` (`client_mac`,`ts`);--> statement-breakpoint

@@ -4,6 +4,52 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — M1 (MVP de coleta)
+- **Coletor UniFi end-to-end**: parser de payloads (`stat/device`, `stat/sta`,
+  `self/sites`) produzindo amostras por site, AP, rádio (ng/na/6e) e cliente.
+- **Fila de jobs em SQLite** com claim atômico (`UPDATE ... RETURNING`), retry
+  exponencial até `max_attempts`, idempotência por chave, recuperação de
+  workers travados via `locked_until` expirado.
+- **Scheduler `croner`** com tick de 1 min para enfileirar `collect` por
+  controller respeitando `pollSeconds`; cron pré-configurado para rollup e
+  retention (handlers chegam no M2).
+- **Worker single-thread** processando jobs com `register(kind, handler)` e
+  `tickOnce()` (para testes).
+- **Job `collect`**: sincroniza catálogo de sites, coleta devices + clientes,
+  computa agregado de site, persiste `metrics_5m` em transação com lookup de
+  `counter_state` para cálculo de delta (tolerante a counter reset).
+- **Pool de UnifiClient por controller** com detecção automática de variant
+  (OS vs Classic) persistida no banco.
+- **AES-GCM** para cifrar senhas e API keys dos controllers em disco usando
+  `MASTER_KEY` (32 bytes).
+- **Rotas REST**:
+  - `GET/POST/DELETE /api/v1/controllers` + `POST /api/v1/controllers/test`.
+  - `GET /api/v1/sites` + `GET /api/v1/sites/:id/devices`.
+  - `GET /api/v1/metrics` com granularidade adaptativa, filtros e `groupBy`.
+  - `GET /api/v1/metrics/recent` para janelas relativas.
+  - `GET /api/v1/metrics/status` (contadores + jobs).
+- **Web UI completa do M1**: setup wizard de senha, login, lista/cadastro de
+  controllers, dashboard com gráfico timeseries (ECharts + brushing/zoom) e
+  resumo tabular por AP. Roteamento state-driven, TanStack Query para fetch.
+- **Schema 5m/1h/1d** com sentinela `''` em dimensões nullable + índice único
+  composto para `ON CONFLICT DO UPDATE`.
+- **5 testes de integração com mock UniFi local** (HTTP real, não MSW):
+  pipeline end-to-end, primeira coleta, delta zero, last_seen_at, reboot
+  detection — totalizando **75 testes verdes**.
+- **Snapshot tests** dos payloads parseados (detecta drift entre firmwares).
+- **Smoke E2E**: `scripts/e2e-smoke.mjs` sobe mock UniFi, cadastra como
+  controller e valida coleta + leitura via HTTP real.
+
+### Changed
+- `metrics_5m/1h/1d.deviceId/radio/clientMac` agora são `NOT NULL DEFAULT ''`
+  (sentinela) para permitir `UNIQUE INDEX` composto + `ON CONFLICT`.
+- `JobQueue.claimNext()` agora recupera jobs `running` com `locked_until`
+  expirado (worker travado).
+- `JobRow` mapeia explicitamente snake_case → camelCase (corrigido bug onde
+  `attempts/maxAttempts` viam undefined).
+- Bootstrap (`src/server/index.ts`) inicia o collector (worker + scheduler)
+  no boot e encerra graciosamente no SIGTERM/SIGINT.
+
 ### Added
 - Scaffolding inicial do projeto (M0 — Foundation).
 - Configuração de build: TypeScript, Vite, Biome, Vitest, Drizzle Kit.

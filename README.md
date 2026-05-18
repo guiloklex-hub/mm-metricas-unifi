@@ -90,7 +90,7 @@ Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 ## Roadmap
 
 - [x] **M0 — Foundation** — scaffolding, CI, schema, login admin
-- [ ] **M1 — MVP coleta** — UnifiClient OS+Classic, CRUD controllers, scheduler, dashboard timeseries
+- [x] **M1 — MVP coleta** — UnifiClient OS+Classic, CRUD controllers, scheduler, dashboard timeseries
 - [ ] **M2 — Rollup + multi-controller** — downsampling 5m→1h→1d, retenção, heatmap
 - [ ] **M3 — Relatórios** — CSV streaming, PDF, comparativos
 - [ ] **M4 — Beta** — audit log, métricas por cliente, i18n, docs completas

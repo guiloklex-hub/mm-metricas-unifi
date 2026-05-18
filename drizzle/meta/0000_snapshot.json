@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "36a70ab4-85c4-4577-9e0a-09e08e680779",
+  "id": "aa42e1fd-1601-43ac-a946-714a0cf95be4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "app_config": {
@@ -539,22 +539,25 @@
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "radio": {
           "name": "radio",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "client_mac": {
           "name": "client_mac",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "client_count": {
           "name": "client_count",
@@ -656,6 +659,18 @@
         }
       },
       "indexes": {
+        "metrics_1d_dim_unique": {
+          "name": "metrics_1d_dim_unique",
+          "columns": [
+            "ts",
+            "controller_id",
+            "site_id",
+            "device_id",
+            "radio",
+            "client_mac"
+          ],
+          "isUnique": true
+        },
         "metrics_1d_device_ts": {
           "name": "metrics_1d_device_ts",
           "columns": [
@@ -706,22 +721,25 @@
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "radio": {
           "name": "radio",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "client_mac": {
           "name": "client_mac",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "client_count": {
           "name": "client_count",
@@ -823,6 +841,18 @@
         }
       },
       "indexes": {
+        "metrics_1h_dim_unique": {
+          "name": "metrics_1h_dim_unique",
+          "columns": [
+            "ts",
+            "controller_id",
+            "site_id",
+            "device_id",
+            "radio",
+            "client_mac"
+          ],
+          "isUnique": true
+        },
         "metrics_1h_device_ts": {
           "name": "metrics_1h_device_ts",
           "columns": [
@@ -873,22 +903,25 @@
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "radio": {
           "name": "radio",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "client_mac": {
           "name": "client_mac",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "client_count": {
           "name": "client_count",
@@ -990,6 +1023,18 @@
         }
       },
       "indexes": {
+        "metrics_5m_dim_unique": {
+          "name": "metrics_5m_dim_unique",
+          "columns": [
+            "ts",
+            "controller_id",
+            "site_id",
+            "device_id",
+            "radio",
+            "client_mac"
+          ],
+          "isUnique": true
+        },
         "metrics_5m_device_ts": {
           "name": "metrics_5m_device_ts",
           "columns": [

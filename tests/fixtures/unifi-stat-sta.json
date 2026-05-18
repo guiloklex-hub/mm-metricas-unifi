@@ -1,0 +1,33 @@
+{
+  "meta": { "rc": "ok" },
+  "data": [
+    {
+      "mac": "11:22:33:44:55:66",
+      "hostname": "notebook-marketing",
+      "name": "Maria - MacBook",
+      "ap_mac": "aa:bb:cc:11:22:33",
+      "tx_bytes": 800000000,
+      "rx_bytes": 1200000000,
+      "tx_packets": 6000000,
+      "rx_packets": 9000000
+    },
+    {
+      "mac": "11:22:33:44:55:77",
+      "hostname": "celular-joao",
+      "ap_mac": "aa:bb:cc:11:22:33",
+      "tx_bytes": 300000000,
+      "rx_bytes": 450000000,
+      "tx_packets": 2500000,
+      "rx_packets": 3800000
+    },
+    {
+      "mac": "11:22:33:44:55:88",
+      "hostname": "tablet-loja",
+      "ap_mac": "aa:bb:cc:11:22:44",
+      "tx_bytes": 50000000,
+      "rx_bytes": 70000000,
+      "tx_packets": 400000,
+      "rx_packets": 550000
+    }
+  ]
+}

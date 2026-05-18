@@ -1,3 +1,4 @@
+import { buildCollector, startCollector, stopCollector } from './collector/index.ts';
 import { createDb } from './db/client.ts';
 import { runMigrations } from './db/migrate.ts';
 import { loadEnv } from './env.ts';
@@ -17,16 +18,22 @@ async function main(): Promise<void> {
   runMigrations(db);
   logger.info('migrations aplicadas');
 
+  const collector = buildCollector({ db, logger, masterKey: env.MASTER_KEY });
+  await startCollector(collector);
+
   const app = await buildApp({
     db,
+    queue: collector.queue,
     logger,
     jwtSecret: env.JWT_SECRET,
+    masterKey: env.MASTER_KEY,
   });
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info({ signal }, 'shutdown solicitado');
     try {
       await app.close();
+      await stopCollector(collector);
       db.$client.close();
       logger.info('shutdown concluído');
       process.exit(0);
@@ -44,7 +51,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });
