@@ -93,8 +93,8 @@ Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 - [x] **M1 — MVP coleta** — UnifiClient OS+Classic, CRUD controllers, scheduler, dashboard timeseries
 - [x] **M2 — Rollup + multi-controller** — downsampling 5m→1h→1d, retenção, heatmap
 - [x] **M3 — Relatórios** — CSV streaming, PDF, comparativos
-- [ ] **M4 — Beta** — audit log, métricas por cliente, i18n, docs completas
-- [ ] **M5 — v1.0** — coverage 80%, E2E, imagem GHCR estável
+- [x] **M4 — Beta hardening** — audit log, top talkers, edit/pause controllers, troca de senha
+- [ ] **M5 — v1.0** — release pipeline + GHCR estável
 
 Detalhes em [`docs/architecture.md`](docs/architecture.md).
 

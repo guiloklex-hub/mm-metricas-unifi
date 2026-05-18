@@ -63,3 +63,19 @@ export function useDeleteController() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['controllers'] }),
   });
 }
+
+export interface ControllerPatch {
+  name?: string;
+  enabled?: boolean;
+  pollSeconds?: number;
+  insecureTls?: boolean;
+}
+
+export function useUpdateController() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: ControllerPatch }) =>
+      api.patch<ControllerPublic>(`/api/v1/controllers/${id}`, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['controllers'] }),
+  });
+}

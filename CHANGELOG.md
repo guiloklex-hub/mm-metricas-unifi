@@ -4,6 +4,23 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — M4 (Beta hardening)
+- **Audit log**: tabela `audit_log` recebe writes em todos os eventos críticos
+  (setup, login success/failed, logout, password change, controller
+  created/updated/deleted). Endpoint `GET /api/v1/audit?limit=N&beforeTs=ts`
+  e seção dedicada em Configurações na UI exibindo histórico com
+  formato relativo de tempo.
+- **Top talkers**: `GET /api/v1/metrics/top-talkers?from=&to=&...` lista os
+  clientes (MACs) com maior consumo de bytes na janela. Card no dashboard
+  mostra top 10 com auto-refresh.
+- **Edit controller**: `PATCH /api/v1/controllers/:id` aceita
+  `{ name, enabled, pollSeconds, insecureTls }`. UI permite pausar/reativar
+  com badge "pausado" e edição inline do intervalo de coleta.
+- **Trocar senha admin**: `POST /api/v1/auth/change-password` com validação
+  da senha atual + nova senha mínima 8 chars. UI em Settings com confirmação.
+- **Smoke E2E expandido para 24 checks** validando todo o pipeline incluindo
+  audit log, PATCH controller, top talkers e change-password com re-login.
+
 ### Added — M3 (Relatórios CSV + PDF)
 - **Export CSV streaming** via `GET /api/v1/export/metrics.csv?from=&to=&...`
   com RFC 4180 (escape de aspas, vírgulas, newlines), Content-Disposition

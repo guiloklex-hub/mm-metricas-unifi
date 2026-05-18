@@ -122,6 +122,23 @@ export function deleteController(db: DB, id: string): boolean {
   return res.changes > 0;
 }
 
+export interface UpdateControllerPatch {
+  name?: string;
+  enabled?: boolean;
+  pollSeconds?: number;
+  insecureTls?: boolean;
+}
+
+export function updateController(db: DB, id: string, patch: UpdateControllerPatch): boolean {
+  const sets: Record<string, unknown> = { updatedAt: Date.now() };
+  if (patch.name !== undefined) sets.name = patch.name;
+  if (patch.enabled !== undefined) sets.enabled = patch.enabled ? 1 : 0;
+  if (patch.pollSeconds !== undefined) sets.pollSeconds = patch.pollSeconds;
+  if (patch.insecureTls !== undefined) sets.insecureTls = patch.insecureTls ? 1 : 0;
+  const res = db.update(controllers).set(sets).where(eq(controllers.id, id)).run();
+  return res.changes > 0;
+}
+
 export function markControllerSeen(db: DB, id: string, when: number = Date.now()): void {
   db.update(controllers)
     .set({ lastSeenAt: when, lastError: null, updatedAt: when })

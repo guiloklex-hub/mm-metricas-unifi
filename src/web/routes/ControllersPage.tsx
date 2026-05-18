@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import {
   type ControllerCreateInput,
+  type ControllerPublic,
   useControllers,
   useCreateController,
   useDeleteController,
+  useUpdateController,
 } from '../api/queries/controllers.ts';
 import { Button } from '../components/ui/Button.tsx';
 import { Card } from '../components/ui/Card.tsx';
@@ -14,6 +16,7 @@ export function ControllersPage() {
   const { data, isLoading } = useControllers();
   const create = useCreateController();
   const remove = useDeleteController();
+  const update = useUpdateController();
   const [showForm, setShowForm] = useState(false);
 
   return (
@@ -31,28 +34,15 @@ export function ControllersPage() {
         ) : data && data.length > 0 ? (
           <ul className="divide-y divide-slate-200 dark:divide-slate-800">
             {data.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{c.name}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    {c.baseUrl} · {c.variant ?? 'auto-detect'} · poll {c.pollSeconds}s
-                  </p>
-                  {c.lastError && (
-                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">⚠ {c.lastError}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>Última coleta: {formatRelative(c.lastSeenAt)}</span>
-                  <Button
-                    variant="danger"
-                    onClick={() => {
-                      if (confirm(`Excluir controller "${c.name}"?`)) remove.mutate(c.id);
-                    }}
-                  >
-                    Excluir
-                  </Button>
-                </div>
-              </li>
+              <ControllerRow
+                key={c.id}
+                controller={c}
+                onToggle={() => update.mutate({ id: c.id, patch: { enabled: !c.enabled } })}
+                onChangePoll={(pollSeconds) => update.mutate({ id: c.id, patch: { pollSeconds } })}
+                onDelete={() => {
+                  if (confirm(`Excluir controller "${c.name}"?`)) remove.mutate(c.id);
+                }}
+              />
             ))}
           </ul>
         ) : (
@@ -76,6 +66,96 @@ export function ControllersPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function ControllerRow({
+  controller: c,
+  onToggle,
+  onChangePoll,
+  onDelete,
+}: {
+  controller: ControllerPublic;
+  onToggle: () => void;
+  onChangePoll: (pollSeconds: number) => void;
+  onDelete: () => void;
+}) {
+  const [editingPoll, setEditingPoll] = useState(false);
+  const [pollDraft, setPollDraft] = useState(c.pollSeconds);
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <div className="min-w-0">
+        <p className="truncate font-medium">
+          {c.name}{' '}
+          {!c.enabled && (
+            <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              pausado
+            </span>
+          )}
+        </p>
+        <p className="truncate text-xs text-slate-500">
+          {c.baseUrl} · {c.variant ?? 'auto-detect'} ·{' '}
+          {editingPoll ? (
+            <>
+              poll{' '}
+              <input
+                type="number"
+                min={60}
+                max={3600}
+                value={pollDraft}
+                onChange={(e) => setPollDraft(Number(e.target.value))}
+                className="w-20 rounded border border-slate-300 px-1 py-0 text-xs dark:border-slate-700 dark:bg-slate-950"
+              />
+              s{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  onChangePoll(pollDraft);
+                  setEditingPoll(false);
+                }}
+                className="text-blue-600 hover:underline"
+              >
+                salvar
+              </button>{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPoll(false);
+                  setPollDraft(c.pollSeconds);
+                }}
+                className="text-slate-500 hover:underline"
+              >
+                cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              poll {c.pollSeconds}s{' '}
+              <button
+                type="button"
+                onClick={() => setEditingPoll(true)}
+                className="text-slate-500 hover:underline"
+              >
+                editar
+              </button>
+            </>
+          )}
+        </p>
+        {c.lastError && (
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">⚠ {c.lastError}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        <span>Última coleta: {formatRelative(c.lastSeenAt)}</span>
+        <Button variant="secondary" onClick={onToggle}>
+          {c.enabled ? 'Pausar' : 'Reativar'}
+        </Button>
+        <Button variant="danger" onClick={onDelete}>
+          Excluir
+        </Button>
+      </div>
+    </li>
   );
 }
 

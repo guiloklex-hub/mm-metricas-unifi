@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useControllers } from '../api/queries/controllers.ts';
 import { useMetricsRecent, useMetricsStatus } from '../api/queries/metrics.ts';
+import { useTopTalkers } from '../api/queries/top-talkers.ts';
 import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeatmap.tsx';
 import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/TimeSeriesChart.tsx';
 import { Card } from '../components/ui/Card.tsx';
@@ -35,6 +36,11 @@ export function DashboardPage() {
         .map((r) => ({ ts: r.ts, value: r.retryRate })),
     [recent.data],
   );
+  const topTalkers = useTopTalkers({
+    seconds: WINDOW_SECONDS[windowKey],
+    controllerId,
+    limit: 10,
+  });
 
   return (
     <div className="space-y-6">
@@ -110,6 +116,39 @@ export function DashboardPage() {
           </p>
         ) : (
           <HourlyHeatmap cells={heatmapCells} formatValue={(v) => formatRate(v)} />
+        )}
+      </Card>
+
+      <Card title="Top talkers (clientes que mais consumiram)">
+        {topTalkers.isLoading ? (
+          <p className="text-sm text-slate-500">Carregando…</p>
+        ) : !topTalkers.data || topTalkers.data.rows.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Sem dados de cliente nesta janela. Coletor precisa estar rodando há pelo menos um ciclo.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2">Cliente (MAC)</th>
+                  <th className="px-3 py-2">Bytes</th>
+                  <th className="px-3 py-2">Pacotes</th>
+                  <th className="px-3 py-2">Amostras</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {topTalkers.data.rows.map((t) => (
+                  <tr key={t.clientMac}>
+                    <td className="px-3 py-2 font-mono text-xs">{t.clientMac}</td>
+                    <td className="px-3 py-2">{formatBytes(t.totalBytes)}</td>
+                    <td className="px-3 py-2">{formatNumber(t.totalPackets)}</td>
+                    <td className="px-3 py-2">{t.samples}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

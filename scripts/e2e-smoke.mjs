@@ -188,7 +188,46 @@ async function main() {
   const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
   assert(pdfBuf.slice(0, 4).toString() === '%PDF', `PDF magic bytes válidos (${pdfBuf.length} bytes)`);
 
-  // 11) Cleanup
+  // 11) M4: audit log
+  const audit = await api('/api/v1/audit?limit=50');
+  assert(audit.status === 200, 'audit log HTTP 200');
+  const actions = (audit.json.data.rows ?? []).map((r) => r.action);
+  assert(actions.includes('auth.setup') || actions.includes('auth.login.success'), 'audit registrou login/setup');
+  assert(actions.includes('controller.created'), 'audit registrou controller.created');
+
+  // 12) M4: PATCH controller
+  const patch = await api(`/api/v1/controllers/${create.json.data.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled: false, pollSeconds: 600 }),
+  });
+  assert(patch.status === 200, 'PATCH controller HTTP 200');
+  assert(patch.json.data.enabled === false, 'controller pausado');
+  assert(patch.json.data.pollSeconds === 600, 'pollSeconds atualizado para 600');
+
+  // 13) M4: top talkers
+  const tt = await api(`/api/v1/metrics/top-talkers?from=${from}&to=${now}`);
+  assert(tt.status === 200, 'top-talkers HTTP 200');
+  assert(Array.isArray(tt.json.data.rows), `top-talkers retornou ${tt.json.data.rows.length} clientes`);
+
+  // 14) M4: trocar senha
+  const NEW_PWD = 'changed-passw0rd-987!';
+  const change = await api('/api/v1/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword: ADMIN_PASSWORD, newPassword: NEW_PWD }),
+  });
+  assert(change.status === 200, 'change-password HTTP 200');
+  cookieJar = '';
+  const reLogin = await api('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ password: NEW_PWD }),
+  });
+  assert(reLogin.status === 200, 'login com nova senha funciona');
+  await api('/api/v1/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword: NEW_PWD, newPassword: ADMIN_PASSWORD }),
+  });
+
+  // 15) Cleanup
   const del = await api(`/api/v1/controllers/${create.json.data.id}`, { method: 'DELETE' });
   assert(del.status === 204, 'controller removido');
 

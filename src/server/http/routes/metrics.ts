@@ -1,8 +1,20 @@
 import type { DB } from '@server/db/client.ts';
 import { queryMetrics } from '@server/db/queries/metrics-read.ts';
+import { listTopTalkers } from '@server/db/queries/top-talkers.ts';
 import { metricsQuerySchema } from '@shared/schemas/metrics.ts';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+
+const topTalkersSchema = z
+  .object({
+    from: z.coerce.number().int().positive(),
+    to: z.coerce.number().int().positive(),
+    controllerId: z.string().min(1).max(64).optional(),
+    siteId: z.string().min(1).max(64).optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(25),
+  })
+  .refine((v) => v.to > v.from, 'to deve ser maior que from')
+  .refine((v) => v.to - v.from <= 30 * 86400, 'janela máxima de 30 dias');
 
 export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/metrics', { preHandler: app.requireAdmin() }, async (req) => {
@@ -79,5 +91,11 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
       groupBy: q.groupBy,
     });
     return { ok: true, data: { granularity, from, to, count: rows.length, rows } };
+  });
+
+  app.get('/api/v1/metrics/top-talkers', { preHandler: app.requireAdmin() }, async (req) => {
+    const q = topTalkersSchema.parse(req.query);
+    const rows = listTopTalkers(db, q);
+    return { ok: true, data: { from: q.from, to: q.to, rows } };
   });
 }

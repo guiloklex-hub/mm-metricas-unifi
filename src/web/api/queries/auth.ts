@@ -48,3 +48,10 @@ export function useLogout() {
     onSuccess: () => qc.clear(),
   });
 }
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (input: { currentPassword: string; newPassword: string }) =>
+      api.post('/api/v1/auth/change-password', input),
+  });
+}

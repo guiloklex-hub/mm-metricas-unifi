@@ -8,6 +8,7 @@ import type { DB } from '@server/db/client.ts';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import authPlugin from './plugins/auth.ts';
 import { registerErrorHandler } from './plugins/error-handler.ts';
+import { registerAuditRoutes } from './routes/audit.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerControllerRoutes } from './routes/controllers.ts';
 import { registerHealthz } from './routes/healthz.ts';
@@ -53,6 +54,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   await registerSiteRoutes(app, opts.db);
   await registerMetricsRoutes(app, opts.db);
   await registerReportRoutes(app, opts.db);
+  await registerAuditRoutes(app, opts.db);
 
   const staticDir = opts.staticDir ?? resolve(__dirname, '../../../dist/web');
   const hasStatic = existsSync(staticDir);
