@@ -39,5 +39,10 @@ updates:
     directory: '/'
     schedule:
       interval: 'monthly'
+    ignore:
+      # Manter Node 22-alpine (LTS Active até 2026-10, Maintenance até 2027-04).
+      # Bumps de major do Node base só quando decidirmos migrar.
+      - dependency-name: 'node'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'chore(docker)'
