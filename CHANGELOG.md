@@ -4,6 +4,19 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-05-18
+
+Primeira release estável. Pipeline completo de coleta, armazenamento, BI e
+relatórios para múltiplos controllers UniFi (OS + Network App self-hosted).
+
+Inclui todas as funcionalidades dos milestones M0–M4 abaixo. Imagem Docker
+multi-arch publicada em `ghcr.io/guiloklex-hub/mm-metricas-unifi:1.0.0` e
+`:latest` via release pipeline automático.
+
+Testes: 90 (unit + integração) + smoke E2E de 24 checks validando o caminho
+completo. CI verde com lint (Biome 2) + typecheck (TS 5.6) + tests +
+docker build + CodeQL semanal.
+
 ### Added — M4 (Beta hardening)
 - **Audit log**: tabela `audit_log` recebe writes em todos os eventos críticos
   (setup, login success/failed, logout, password change, controller

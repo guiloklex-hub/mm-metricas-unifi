@@ -4,7 +4,7 @@ Coleta, armazenamento e BI de métricas UniFi — self-hosted, multi-controller,
 
 Construído para resolver um problema concreto: a interface nova do UniFi Network não mostra mais, por antena, contadores de pacotes/descartes/erros/retransmissão que a diretoria pedia em relatório. Esta ferramenta poll-eia controllers UniFi periodicamente (OS Console + Network Application self-hosted), guarda séries temporais em SQLite e oferece dashboards, relatórios CSV/PDF e comparativos entre filiais.
 
-> **Status:** em desenvolvimento ativo. M0 (foundation) inicial — ainda não usável em produção. Veja o [roadmap](#roadmap).
+> **Status:** v1.0 estável. Pipeline completo de coleta, BI e relatórios pronto para uso em produção self-hosted. Imagem Docker em `ghcr.io/guiloklex-hub/mm-metricas-unifi:latest`.
 
 ## Funcionalidades planejadas
 
@@ -94,7 +94,7 @@ Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 - [x] **M2 — Rollup + multi-controller** — downsampling 5m→1h→1d, retenção, heatmap
 - [x] **M3 — Relatórios** — CSV streaming, PDF, comparativos
 - [x] **M4 — Beta hardening** — audit log, top talkers, edit/pause controllers, troca de senha
-- [ ] **M5 — v1.0** — release pipeline + GHCR estável
+- [x] **M5 — v1.0** — release pipeline + GHCR estável
 
 Detalhes em [`docs/architecture.md`](docs/architecture.md).
 
