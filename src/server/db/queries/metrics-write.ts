@@ -190,8 +190,10 @@ export interface HistoricalSample {
   deviceId: string | null;
   /** Delta de bytes na bucket (já agregado pelo controller). */
   dTxBytes: number | null;
-  /** Delta de packets — geralmente null nos `stat/report`. */
+  /** Delta de packets — proxy `wifi_tx_attempts`; null em firmwares que não retornam. */
   dTxPackets: number | null;
+  /** Delta de pacotes descartados — `wifi_tx_dropped`; null em firmwares que não retornam. */
+  dTxDropped: number | null;
   /** Clientes presentes no início da janela (do `num_sta` do report). */
   clientCount: number | null;
 }
@@ -225,6 +227,8 @@ export function insertHistoricalSamples(
 
   const sqlite = db.$client;
 
+  // `drop_rate` é calculado quando temos dTxDropped E dTxPackets (proxy de
+  // attempts/packets). Quando algum é null, drop_rate fica null.
   const insert = sqlite.prepare(
     `INSERT INTO ${table} (
        ts, controller_id, site_id, device_id, radio, client_mac,
@@ -232,7 +236,7 @@ export function insertHistoricalSamples(
        d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
        retry_rate, error_rate, drop_rate
      )
-     VALUES (?, ?, ?, ?, '', '', ?, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL)
+     VALUES (?, ?, ?, ?, '', '', ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO NOTHING`,
   );
 
@@ -242,6 +246,7 @@ export function insertHistoricalSamples(
   const tx = sqlite.transaction((items: HistoricalSample[]) => {
     for (const s of items) {
       const devKey = s.deviceId ?? '';
+      const dropRate = rate(s.dTxDropped, s.dTxPackets);
       const result = insert.run(
         s.ts,
         s.controllerId,
@@ -250,6 +255,8 @@ export function insertHistoricalSamples(
         s.clientCount,
         s.dTxBytes,
         s.dTxPackets,
+        s.dTxDropped,
+        dropRate,
       );
       if (result.changes > 0) inserted += 1;
       else skipped += 1;

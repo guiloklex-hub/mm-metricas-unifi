@@ -4,6 +4,24 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-05-18
+
+### Changed
+- **Backfill: mais campos populados quando o firmware expõe**. Ampliamos
+  `STAT_REPORT_ATTRS` (`wlan_bytes`, `wifi_tx_attempts`, `wifi_tx_dropped`),
+  e o parser histórico agora mapeia:
+  - `wifi_tx_attempts` → `d_tx_packets` (proxy de packets ao vivo)
+  - `wifi_tx_dropped` → `d_tx_dropped`
+  - `wlan_bytes` → `d_tx_bytes` (fallback adicional)
+  Quando `d_tx_dropped` e `d_tx_packets` ambos presentes, o `drop_rate`
+  agora é calculado para amostras históricas também.
+
+### Documentation
+- README ganhou nota explícita sobre a limitação do `stat/report` do UniFi:
+  `tx_errors`/`tx_retries` são counters por rádio em tempo real e **não
+  persistem no histórico do controller** — daí ficarem `NULL` em janelas
+  pré-cadastro. O coletor ao vivo preenche tudo daqui pra frente.
+
 ## [1.0.3] — 2026-05-18
 
 ### Added

@@ -97,7 +97,15 @@ export interface UnifiStatReportPoint {
   bytes?: number;
   tx_bytes?: number;
   rx_bytes?: number;
+  wlan_bytes?: number;
   num_sta?: number;
   'wlan-num_sta'?: number;
+  /**
+   * Tentativas de TX Wi-Fi no intervalo (≈ tx_packets ao vivo). Disponível
+   * apenas em alguns firmwares; ausente fora deles.
+   */
+  wifi_tx_attempts?: number;
+  /** Pacotes Wi-Fi descartados no intervalo. Disponível em alguns firmwares. */
+  wifi_tx_dropped?: number;
   duration?: number;
 }

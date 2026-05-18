@@ -24,6 +24,7 @@ export interface HistoricalSampleInput {
   deviceMac: string | null;
   dTxBytes: number | null;
   dTxPackets: number | null;
+  dTxDropped: number | null;
   clientCount: number | null;
 }
 
@@ -40,12 +41,19 @@ export function parseStatReportPoint(
   // O controller envia `time` em ms. Convertemos para segundos.
   const tsSec = Math.floor(point.time / 1000);
 
-  // bytes agregado: alguns firmwares enviam `bytes`, outros `tx_bytes`+`rx_bytes`.
-  const bytes = sumNullable(intOrNull(point.tx_bytes), intOrNull(point.rx_bytes));
-  const dTxBytes = bytes ?? intOrNull(point.bytes);
+  // bytes agregado. Firmwares variam: alguns enviam só `bytes`, outros
+  // `tx_bytes`+`rx_bytes` (somamos), outros ainda `wlan_bytes`. Tentamos na
+  // ordem mais informativa.
+  const txRxSum = sumNullable(intOrNull(point.tx_bytes), intOrNull(point.rx_bytes));
+  const dTxBytes = txRxSum ?? intOrNull(point.bytes) ?? intOrNull(point.wlan_bytes);
 
-  // packets raramente vem em stat/report; preservamos null.
-  const dTxPackets: number | null = null;
+  // Wi-Fi TX attempts ≈ tx_packets ao vivo. Só alguns firmwares retêm em
+  // stat/report; ausente em outros — fica null e a coleta ao vivo preenche
+  // daqui pra frente.
+  const dTxPackets = intOrNull(point.wifi_tx_attempts);
+
+  // Pacotes descartados — disponível em alguns firmwares.
+  const dTxDropped = intOrNull(point.wifi_tx_dropped);
 
   const clientCount = intOrNull(point.num_sta) ?? intOrNull(point['wlan-num_sta']);
 
@@ -59,12 +67,29 @@ export function parseStatReportPoint(
     deviceMac,
     dTxBytes,
     dTxPackets,
+    dTxDropped,
     clientCount,
   };
 }
 
-/** Atributos solicitados ao `/stat/report` — quanto mais, mais lento; pedimos só o essencial. */
-export const STAT_REPORT_ATTRS = ['bytes', 'tx_bytes', 'rx_bytes', 'num_sta', 'time'] as const;
+/**
+ * Atributos solicitados ao `/stat/report`. O controller só retorna o que está
+ * em `attrs`, então listamos todos que podem aparecer (firmware varia o que
+ * envia). Tx packets/errors/retries do `/stat/device` NÃO existem no histórico
+ * do controller — são counters por interface de rádio em tempo real, e não
+ * persistem em `stat/report`. Use `wifi_tx_attempts` como proxy de packets
+ * quando disponível.
+ */
+export const STAT_REPORT_ATTRS = [
+  'bytes',
+  'tx_bytes',
+  'rx_bytes',
+  'wlan_bytes',
+  'num_sta',
+  'wifi_tx_attempts',
+  'wifi_tx_dropped',
+  'time',
+] as const;
 
 function intOrNull(value: unknown): number | null {
   if (typeof value !== 'number') return null;

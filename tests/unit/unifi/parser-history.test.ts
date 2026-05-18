@@ -57,9 +57,31 @@ describe('parseStatReportPoint', () => {
     expect(parsed?.dTxBytes).toBeNull();
   });
 
-  it('preserva null em packets (stat/report não envia)', () => {
+  it('preserva null em packets quando firmware não envia wifi_tx_attempts', () => {
     const parsed = parseStatReportPoint({ time: 1_700_000_000_000, tx_bytes: 100 }, SCOPE_SITE);
     expect(parsed?.dTxPackets).toBeNull();
+    expect(parsed?.dTxDropped).toBeNull();
+  });
+
+  it('mapeia wifi_tx_attempts → dTxPackets quando disponível', () => {
+    const parsed = parseStatReportPoint(
+      { time: 1_700_000_000_000, tx_bytes: 100, wifi_tx_attempts: 1234 },
+      SCOPE_SITE,
+    );
+    expect(parsed?.dTxPackets).toBe(1234);
+  });
+
+  it('mapeia wifi_tx_dropped → dTxDropped quando disponível', () => {
+    const parsed = parseStatReportPoint(
+      { time: 1_700_000_000_000, tx_bytes: 100, wifi_tx_dropped: 42 },
+      SCOPE_SITE,
+    );
+    expect(parsed?.dTxDropped).toBe(42);
+  });
+
+  it('aceita wlan_bytes como fallback de bytes', () => {
+    const parsed = parseStatReportPoint({ time: 1_700_000_000_000, wlan_bytes: 9999 }, SCOPE_SITE);
+    expect(parsed?.dTxBytes).toBe(9999);
   });
 
   it('aceita wlan-num_sta como fallback de num_sta', () => {

@@ -95,6 +95,17 @@ Comportamento:
 - O job roda em background na fila de jobs. Status aparece ao lado do botão (`pending`/`running`/`done`/`failed`).
 - Idempotente por `controllerId`: chamar duas vezes seguidas não duplica jobs.
 
+> **Limitação do UniFi.** O endpoint `stat/report` do controller retém apenas
+> `bytes`/`tx_bytes`/`rx_bytes`, `num_sta` e — dependendo do firmware —
+> `wifi_tx_attempts` (proxy de packets) e `wifi_tx_dropped`. Counters de erro
+> e retransmissão (`tx_errors`, `tx_retries`) são lidos do `/stat/device` em
+> tempo real e **não persistem no histórico do controller**. Portanto, no
+> backfill os campos `d_tx_errors`/`d_tx_retries`/`retry_rate`/`error_rate`
+> ficam `NULL` para janelas anteriores ao cadastro do controller; o coletor
+> ao vivo passa a preencher tudo a cada 5min daqui pra frente. `d_tx_packets`
+> e `d_tx_dropped` vêm preenchidos somente em firmwares que expõem
+> `wifi_tx_attempts`/`wifi_tx_dropped` em `stat/report`.
+
 API equivalente:
 
 ```bash

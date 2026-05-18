@@ -224,6 +224,7 @@ function toHistoricalSample(
     deviceId,
     dTxBytes: parsed.dTxBytes,
     dTxPackets: parsed.dTxPackets,
+    dTxDropped: parsed.dTxDropped,
     clientCount: parsed.clientCount,
   };
 }

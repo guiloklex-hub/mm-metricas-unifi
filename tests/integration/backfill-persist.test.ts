@@ -24,6 +24,7 @@ function historicalSample(
     deviceId,
     dTxBytes,
     dTxPackets: null,
+    dTxDropped: null,
     clientCount,
   };
 }
@@ -34,6 +35,29 @@ describe('insertHistoricalSamples', () => {
     db = createTestDb();
   });
   afterEach(() => closeTestDb(db));
+
+  it('calcula drop_rate quando dTxDropped e dTxPackets estão presentes', () => {
+    insertHistoricalSamples(db, 'metrics_5m', [
+      {
+        ts: 1_700_000_000,
+        controllerId: CTRL,
+        siteId: SITE,
+        deviceId: DEVICE,
+        dTxBytes: 1000,
+        dTxPackets: 100,
+        dTxDropped: 5,
+        clientCount: 10,
+      },
+    ]);
+    const row = db.$client.prepare('SELECT * FROM metrics_5m').get() as {
+      d_tx_packets: number | null;
+      d_tx_dropped: number | null;
+      drop_rate: number | null;
+    };
+    expect(row.d_tx_packets).toBe(100);
+    expect(row.d_tx_dropped).toBe(5);
+    expect(row.drop_rate).toBeCloseTo(0.05);
+  });
 
   it('insere amostras históricas em metrics_5m e popula d_tx_bytes/client_count', () => {
     const result = insertHistoricalSamples(db, 'metrics_5m', [
