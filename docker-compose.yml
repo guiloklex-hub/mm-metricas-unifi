@@ -19,7 +19,7 @@ services:
       RETENTION_5M_DAYS: 30
       RETENTION_1H_DAYS: 365
     volumes:
-      - ./data:/app/data
+      - ./data:/app/data:Z
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
       interval: 30s
