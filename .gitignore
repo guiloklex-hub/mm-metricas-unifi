@@ -12,7 +12,8 @@ data/*
 *.db-journal
 *.db-shm
 *.db-wal
-reports/
+data/reports/
+!src/server/reports/
 
 # Env and secrets
 .env
