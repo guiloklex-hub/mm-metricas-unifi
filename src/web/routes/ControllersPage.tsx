@@ -2,9 +2,11 @@ import { useState } from 'react';
 import {
   type ControllerCreateInput,
   type ControllerPublic,
+  useBackfillStatus,
   useControllers,
   useCreateController,
   useDeleteController,
+  useRequestBackfill,
   useUpdateController,
 } from '../api/queries/controllers.ts';
 import { Button } from '../components/ui/Button.tsx';
@@ -148,6 +150,7 @@ function ControllerRow({
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
         <span>Última coleta: {formatRelative(c.lastSeenAt)}</span>
+        <BackfillButton controllerId={c.id} />
         <Button variant="secondary" onClick={onToggle}>
           {c.enabled ? 'Pausar' : 'Reativar'}
         </Button>
@@ -156,6 +159,84 @@ function ControllerRow({
         </Button>
       </div>
     </li>
+  );
+}
+
+function BackfillButton({ controllerId }: { controllerId: string }) {
+  const [showForm, setShowForm] = useState(false);
+  const [days, setDays] = useState(30);
+  const [includeDaily, setIncludeDaily] = useState(false);
+  const request = useRequestBackfill();
+  const status = useBackfillStatus(controllerId);
+  const job = status.data?.job ?? null;
+  const running = job?.status === 'pending' || job?.status === 'running';
+
+  if (showForm) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-300 px-2 py-1 dark:border-slate-700">
+        <label className="inline-flex items-center gap-1">
+          dias:
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="w-16 rounded border border-slate-300 px-1 py-0 text-xs dark:border-slate-700 dark:bg-slate-950"
+          />
+        </label>
+        <label className="inline-flex items-center gap-1">
+          <input
+            type="checkbox"
+            checked={includeDaily}
+            onChange={(e) => setIncludeDaily(e.target.checked)}
+          />
+          incluir granularidade diária (longo prazo)
+        </label>
+        <button
+          type="button"
+          disabled={request.isPending}
+          onClick={() => {
+            request.mutate(
+              { id: controllerId, days, includeDaily },
+              { onSuccess: () => setShowForm(false) },
+            );
+          }}
+          className="text-blue-600 hover:underline disabled:opacity-50"
+        >
+          {request.isPending ? 'enviando…' : 'iniciar'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowForm(false)}
+          className="text-slate-500 hover:underline"
+        >
+          cancelar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-2">
+      {job && (
+        <span
+          className={
+            running
+              ? 'text-amber-600 dark:text-amber-400'
+              : job.status === 'failed'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-emerald-600 dark:text-emerald-400'
+          }
+        >
+          backfill: {job.status}
+          {running ? '…' : ''}
+        </span>
+      )}
+      <Button variant="secondary" onClick={() => setShowForm(true)} disabled={running}>
+        {running ? 'Importando…' : 'Importar histórico'}
+      </Button>
+    </span>
   );
 }
 

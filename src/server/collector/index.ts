@@ -1,6 +1,7 @@
 import type { DB } from '@server/db/client.ts';
 import type { Logger } from 'pino';
 import { UnifiClientPool } from './clients-pool.ts';
+import { type BackfillJobPayload, runBackfillJob } from './jobs/backfill.ts';
 import { type CollectJobPayload, runCollectJob } from './jobs/collect.ts';
 import { runRetention } from './jobs/retention.ts';
 import { runRollup1d, runRollup1h } from './jobs/rollup.ts';
@@ -57,6 +58,20 @@ export function buildCollector({
   });
   worker.register('bootstrap_controller', async () => {
     logger.debug('bootstrap_controller — disparado pela rota de criação');
+  });
+  worker.register('backfill', async (job) => {
+    const payload = job.payloadJson ? (JSON.parse(job.payloadJson) as BackfillJobPayload) : null;
+    if (!payload?.controllerId) throw new Error('backfill job sem controllerId');
+    if (!Number.isFinite(payload.days) || payload.days <= 0) {
+      throw new Error('backfill job com days inválido');
+    }
+    const result = await runBackfillJob(payload, { db, pool, logger });
+    if (result.errors.length > 0) {
+      logger.warn(
+        { controllerId: result.controllerId, errors: result.errors },
+        'backfill concluído com erros parciais',
+      );
+    }
   });
 
   const scheduler = new Scheduler(db, queue, logger);

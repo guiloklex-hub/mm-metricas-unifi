@@ -79,3 +79,46 @@ export function useUpdateController() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['controllers'] }),
   });
 }
+
+export interface BackfillRequest {
+  days: number;
+  intervals?: Array<'5minutes' | 'hourly' | 'daily'>;
+  includeDaily?: boolean;
+}
+
+export interface BackfillStatus {
+  controllerId: string;
+  job: {
+    id: string;
+    status: 'pending' | 'running' | 'done' | 'failed';
+    attempts: number;
+    runAt: number;
+    updatedAt: number;
+    lastError: string | null;
+  } | null;
+}
+
+export function useRequestBackfill() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...input }: { id: string } & BackfillRequest) =>
+      api.post<{ jobId: string; controllerId: string; days: number }>(
+        `/api/v1/controllers/${id}/backfill`,
+        input,
+      ),
+    onSuccess: (_data, vars) =>
+      qc.invalidateQueries({ queryKey: ['controllers', vars.id, 'backfill-status'] }),
+  });
+}
+
+export function useBackfillStatus(controllerId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['controllers', controllerId, 'backfill-status'],
+    queryFn: () => api.get<BackfillStatus>(`/api/v1/controllers/${controllerId}/backfill/status`),
+    enabled: options?.enabled ?? true,
+    refetchInterval: (query) => {
+      const status = query.state.data?.job?.status;
+      return status === 'pending' || status === 'running' ? 3000 : false;
+    },
+  });
+}

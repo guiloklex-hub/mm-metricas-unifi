@@ -6,6 +6,7 @@ import {
   selfSitesPath,
   statDevicePath,
   statHealthPath,
+  statReportPath,
   statStaPath,
 } from './endpoints.ts';
 import type {
@@ -15,6 +16,7 @@ import type {
   UnifiControllerConfig,
   UnifiDevicePayload,
   UnifiSitePayload,
+  UnifiStatReportPoint,
 } from './types.ts';
 
 export class UnifiClientError extends Error {
@@ -156,6 +158,36 @@ export class UnifiClient {
     return body.data;
   }
 
+  /**
+   * Consulta o endpoint histórico `/stat/report/{interval}.{subject}`. Diferente
+   * de `fetchDevices`/`fetchClients`, este é POST com um body indicando a
+   * janela (`start`/`end` em epoch ms) e a lista de `attrs` desejados.
+   *
+   * Retorna a série pré-agregada pelo próprio controller — útil para
+   * backfill de histórico já existente no UniFi (até onde a retenção do
+   * controller permitir: tipicamente 5min~7d, hourly~30d, daily~12-24m).
+   */
+  async fetchStatReport(
+    siteName: string,
+    interval: '5minutes' | 'hourly' | 'daily' | 'monthly',
+    subject: 'site' | 'ap' | 'user' | 'gw',
+    opts: { start: number; end: number; attrs: string[]; macs?: string[] },
+  ): Promise<UnifiStatReportPoint[]> {
+    await this.ensureReady();
+    const url = joinUrl(
+      this.config.baseUrl,
+      statReportPath(this.variant, siteName, interval, subject),
+    );
+    const payload: Record<string, unknown> = {
+      attrs: opts.attrs,
+      start: opts.start,
+      end: opts.end,
+    };
+    if (opts.macs && opts.macs.length > 0) payload.macs = opts.macs;
+    const body = await this.authedPost(url, payload);
+    return (body.data ?? []) as UnifiStatReportPoint[];
+  }
+
   private async authedGet(url: string): Promise<{ data?: unknown[] }> {
     const headers = this.buildAuthHeaders();
     let res = await request(url, { method: 'GET', dispatcher: this.dispatcher, headers });
@@ -172,6 +204,30 @@ export class UnifiClient {
     if (res.statusCode >= 400) {
       await res.body.text();
       throw new UnifiClientError(`GET ${url} retornou ${res.statusCode}`, res.statusCode);
+    }
+    const text = await res.body.text();
+    const parsed = text ? (JSON.parse(text) as { data?: unknown[] }) : {};
+    return parsed;
+  }
+
+  private async authedPost(url: string, payload: unknown): Promise<{ data?: unknown[] }> {
+    const headers = { ...this.buildAuthHeaders(), 'content-type': 'application/json' };
+    const body = JSON.stringify(payload);
+    let res = await request(url, { method: 'POST', dispatcher: this.dispatcher, headers, body });
+    if (res.statusCode === 401 && this.config.auth.mode === 'local') {
+      await res.body.text();
+      this.session = null;
+      await this.loginMutex.run(() => this.login());
+      res = await request(url, {
+        method: 'POST',
+        dispatcher: this.dispatcher,
+        headers: { ...this.buildAuthHeaders(), 'content-type': 'application/json' },
+        body,
+      });
+    }
+    if (res.statusCode >= 400) {
+      await res.body.text();
+      throw new UnifiClientError(`POST ${url} retornou ${res.statusCode}`, res.statusCode);
     }
     const text = await res.body.text();
     const parsed = text ? (JSON.parse(text) as { data?: unknown[] }) : {};

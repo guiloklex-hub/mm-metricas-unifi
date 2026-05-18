@@ -11,6 +11,7 @@ export type AuditAction =
   | 'controller.created'
   | 'controller.deleted'
   | 'controller.updated'
+  | 'controller.backfill.requested'
   | 'report.csv'
   | 'report.pdf';
 

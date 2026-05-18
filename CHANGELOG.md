@@ -4,6 +4,23 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-05-18
+
+### Added
+- **Backfill de histórico do controller** (`POST /api/v1/controllers/:id/backfill`
+  + UI em "Controllers → Importar histórico"). Importa séries pré-agregadas
+  do endpoint `/stat/report/{5minutes|hourly|daily}.{site|ap}` do próprio
+  controller, populando `metrics_5m`/`metrics_1h`/`metrics_1d` retroativamente
+  (até a retenção do controller, tipicamente 5min ~7d, hourly ~30d,
+  daily ~12-24m). Insere com `ON CONFLICT DO NOTHING` para nunca sobrescrever
+  amostras "reais" capturadas pelo coletor em tempo real. Não toca em
+  `counter_state` (não interfere no delta-calc do live).
+- Novo job kind `backfill` na fila (idempotente por `controllerId`).
+- Endpoint `GET /api/v1/controllers/:id/backfill/status` para acompanhar
+  progresso (polling a cada 3s na UI enquanto em `pending`/`running`).
+- 13 testes novos cobrindo parser (`stat/report` → samples) e persistência
+  (DO NOTHING, três tabelas, sem mutação de `counter_state`).
+
 ## [1.0.2] — 2026-05-18
 
 ### Fixed

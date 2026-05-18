@@ -12,6 +12,7 @@ Construído para resolver um problema concreto: a interface nova do UniFi Networ
 - Granularidade: por site, AP, rádio (2.4/5/6 GHz) e cliente
 - Métricas: client count, tx bytes, tx packets, tx dropped, tx errors, tx retries + taxas calculadas (`retry_rate`, `error_rate`, `drop_rate`)
 - Armazenamento local em SQLite (WAL) com downsampling: 5min × 30d → hourly × 1 ano → daily indefinido
+- **Backfill de histórico**: importa séries já existentes no controller (endpoint `stat/report`) — não é preciso esperar o sistema captar do zero
 - Dashboard BI com gráficos interativos (timeseries, heatmap, comparativos)
 - Exportação CSV (streaming) e PDF (relatório executivo)
 - Multi-localidade — cadastre quantos controllers quiser
@@ -76,6 +77,36 @@ Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 
 - `MASTER_KEY` — 32 bytes em base64. Cifra credenciais dos controllers no banco. Trocar invalida senhas guardadas.
 - `JWT_SECRET` — segredo para assinar sessões.
+
+## Backfill de histórico
+
+Por padrão, o coletor começa a registrar **a partir do momento em que o controller é cadastrado** (ele lê o snapshot cumulativo do `/stat/device` e calcula deltas em janelas de 5 minutos). Para evitar perder os dados que o próprio UniFi já possui, há uma rotina de **backfill** que consome o endpoint histórico `/stat/report/{interval}.{subject}`.
+
+Na tela **Controllers**, cada controller cadastrado expõe um botão **"Importar histórico"**. Ao clicar, você escolhe:
+
+- **Janela em dias** (1–365). O quanto recuar a partir de agora. A retenção do próprio controller manda — tipicamente 5min ~7d, hourly ~30d, daily ~12-24m.
+- **Incluir granularidade diária**: marque se quiser cobertura de longo prazo (popula `metrics_1d`).
+
+Comportamento:
+
+- Para cada site habilitado, busca a série agregada do site e a série por AP em cada granularidade (`5minutes`, `hourly` e opcionalmente `daily`).
+- Insere com `INSERT ... ON CONFLICT DO NOTHING` — **nunca sobrescreve** uma amostra "real" já capturada pelo coletor em tempo real.
+- Os counters cumulativos (`tx_bytes`) ficam `NULL` para amostras históricas, mas os **deltas da janela** (`d_tx_bytes`, base para todos os relatórios e gráficos) são preenchidos.
+- O job roda em background na fila de jobs. Status aparece ao lado do botão (`pending`/`running`/`done`/`failed`).
+- Idempotente por `controllerId`: chamar duas vezes seguidas não duplica jobs.
+
+API equivalente:
+
+```bash
+# disparar backfill (precisa de sessão admin)
+curl -X POST http://localhost:3000/api/v1/controllers/{controllerId}/backfill \
+  -H 'content-type: application/json' \
+  -b cookies.txt \
+  -d '{"days": 30, "includeDaily": false}'
+
+# consultar status
+curl http://localhost:3000/api/v1/controllers/{controllerId}/backfill/status -b cookies.txt
+```
 
 ## Documentação
 

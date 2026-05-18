@@ -178,3 +178,84 @@ function detectReset(s: MetricSampleInput, last: Partial<Record<MetricName, numb
   }
   return false;
 }
+
+/* -------------------------- Persistência histórica -------------------------- */
+
+export type HistoricalTable = 'metrics_5m' | 'metrics_1h' | 'metrics_1d';
+
+export interface HistoricalSample {
+  ts: number; // epoch s, alinhado à bucket da tabela
+  controllerId: string;
+  siteId: string;
+  deviceId: string | null;
+  /** Delta de bytes na bucket (já agregado pelo controller). */
+  dTxBytes: number | null;
+  /** Delta de packets — geralmente null nos `stat/report`. */
+  dTxPackets: number | null;
+  /** Clientes presentes no início da janela (do `num_sta` do report). */
+  clientCount: number | null;
+}
+
+export interface InsertHistoricalResult {
+  inserted: number;
+  skipped: number;
+}
+
+/**
+ * Insere amostras pré-agregadas (vindas de `/stat/report/{interval}.{subject}`)
+ * em uma das tabelas de rollup. Estratégia:
+ *
+ *  - Preenche `d_tx_bytes` / `d_tx_packets` / `client_count` direto.
+ *  - Counters cumulativos (`tx_bytes` etc.) ficam `NULL` — não temos esse
+ *    dado no report e o storage aceita null.
+ *  - Usa `INSERT ... ON CONFLICT DO NOTHING`: backfill nunca sobrescreve
+ *    amostra "real" já capturada pelo coletor em tempo real.
+ *  - **Não toca em `counter_state`** — esses pontos são históricos e não
+ *    devem influenciar o delta-calc da próxima coleta ao vivo.
+ *
+ * O parâmetro `table` controla qual rollup popular: `metrics_5m`, `metrics_1h`
+ * ou `metrics_1d`. As três têm schema idêntico, então o SQL é parametrizado.
+ */
+export function insertHistoricalSamples(
+  db: DB,
+  table: HistoricalTable,
+  samples: HistoricalSample[],
+): InsertHistoricalResult {
+  if (samples.length === 0) return { inserted: 0, skipped: 0 };
+
+  const sqlite = db.$client;
+
+  const insert = sqlite.prepare(
+    `INSERT INTO ${table} (
+       ts, controller_id, site_id, device_id, radio, client_mac,
+       client_count, tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
+       d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
+       retry_rate, error_rate, drop_rate
+     )
+     VALUES (?, ?, ?, ?, '', '', ?, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL)
+     ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO NOTHING`,
+  );
+
+  let inserted = 0;
+  let skipped = 0;
+
+  const tx = sqlite.transaction((items: HistoricalSample[]) => {
+    for (const s of items) {
+      const devKey = s.deviceId ?? '';
+      const result = insert.run(
+        s.ts,
+        s.controllerId,
+        s.siteId,
+        devKey,
+        s.clientCount,
+        s.dTxBytes,
+        s.dTxPackets,
+      );
+      if (result.changes > 0) inserted += 1;
+      else skipped += 1;
+    }
+  });
+
+  tx(samples);
+  return { inserted, skipped };
+}

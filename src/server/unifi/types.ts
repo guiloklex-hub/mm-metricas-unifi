@@ -81,3 +81,23 @@ export interface UnifiClientPayload {
   tx_packets?: number;
   rx_packets?: number;
 }
+
+/**
+ * Ponto de série temporal retornado por `/stat/report/{interval}.{subject}`.
+ * Subjects relevantes:
+ *   - `site`  → 1 série por site (não vem `ap` no payload)
+ *   - `ap`    → 1 série por AP (vem `ap` = MAC do AP)
+ * Os campos `tx_bytes`/`rx_bytes` aqui são **deltas da janela** (não cumulativos),
+ * diferente de `/stat/device`. `bytes` = tx+rx quando o controller não envia
+ * separado. `num_sta` = média/contagem na janela.
+ */
+export interface UnifiStatReportPoint {
+  time: number; // epoch ms (alinhado ao início da bucket conforme o interval)
+  ap?: string;
+  bytes?: number;
+  tx_bytes?: number;
+  rx_bytes?: number;
+  num_sta?: number;
+  'wlan-num_sta'?: number;
+  duration?: number;
+}

@@ -14,7 +14,13 @@ import { ulid } from 'ulid';
  * O claim usa `UPDATE ... RETURNING` que SQLite serializa, então não há TOCTOU.
  */
 
-export type JobKind = 'collect' | 'rollup_1h' | 'rollup_1d' | 'retention' | 'bootstrap_controller';
+export type JobKind =
+  | 'collect'
+  | 'rollup_1h'
+  | 'rollup_1d'
+  | 'retention'
+  | 'bootstrap_controller'
+  | 'backfill';
 
 export interface JobRow {
   id: string;
@@ -173,6 +179,27 @@ export class JobQueue {
       .prepare(`DELETE FROM jobs WHERE status IN ('done', 'failed') AND updated_at < ?`)
       .run(threshold);
     return res.changes;
+  }
+
+  getJob(id: string): JobRow | null {
+    const raw = this.db.$client.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as
+      | JobRowRaw
+      | undefined;
+    return raw ? toJobRow(raw) : null;
+  }
+
+  /** Último job de uma dada `kind` para um `idempotencyKey` (pega o mais recente, qualquer status). */
+  findLatestByKey(kind: JobKind, key: string): JobRow | null {
+    const prefix = `${kind}:${key}:`;
+    const raw = this.db.$client
+      .prepare(
+        `SELECT * FROM jobs
+         WHERE kind = ? AND id LIKE ?
+         ORDER BY updated_at DESC
+         LIMIT 1`,
+      )
+      .get(kind, `${prefix}%`) as JobRowRaw | undefined;
+    return raw ? toJobRow(raw) : null;
   }
 
   countByStatus(): Record<JobRow['status'], number> {

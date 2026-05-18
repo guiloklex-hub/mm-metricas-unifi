@@ -22,6 +22,15 @@ const updateControllerSchema = z.object({
   insecureTls: z.boolean().optional(),
 });
 
+const backfillBodySchema = z.object({
+  days: z.number().int().min(1).max(365),
+  intervals: z
+    .array(z.enum(['5minutes', 'hourly', 'daily']))
+    .min(1)
+    .optional(),
+  includeDaily: z.boolean().optional(),
+});
+
 export interface RegisterControllerRoutesOptions {
   db: DB;
   queue: JobQueue;
@@ -94,6 +103,69 @@ export async function registerControllerRoutes(
     });
     reply.code(204).send();
   });
+
+  // Backfill de histórico vindo do próprio controller (endpoint stat/report).
+  app.post(
+    '/api/v1/controllers/:id/backfill',
+    { preHandler: app.requireAdmin() },
+    async (req, reply) => {
+      const { id } = idParamSchema.parse(req.params);
+      const body = backfillBodySchema.parse(req.body ?? {});
+      const controller = getController(db, id);
+      if (!controller) {
+        reply.code(404).send({ ok: false, error: 'not_found' });
+        return;
+      }
+      const jobId = queue.enqueue(
+        'backfill',
+        {
+          controllerId: id,
+          days: body.days,
+          intervals: body.intervals,
+          includeDaily: body.includeDaily,
+        },
+        undefined,
+        { idempotencyKey: id, maxAttempts: 1 },
+      );
+      logAudit(db, {
+        action: 'controller.backfill.requested',
+        target: id,
+        metadata: { days: body.days, intervals: body.intervals, includeDaily: body.includeDaily },
+      });
+      reply.code(202).send({ ok: true, data: { jobId, controllerId: id, days: body.days } });
+    },
+  );
+
+  app.get(
+    '/api/v1/controllers/:id/backfill/status',
+    { preHandler: app.requireAdmin() },
+    async (req, reply) => {
+      const { id } = idParamSchema.parse(req.params);
+      const controller = getController(db, id);
+      if (!controller) {
+        reply.code(404).send({ ok: false, error: 'not_found' });
+        return;
+      }
+      const job = queue.findLatestByKey('backfill', id);
+      if (!job) {
+        return { ok: true, data: { controllerId: id, job: null } };
+      }
+      return {
+        ok: true,
+        data: {
+          controllerId: id,
+          job: {
+            id: job.id,
+            status: job.status,
+            attempts: job.attempts,
+            runAt: job.runAt,
+            updatedAt: job.updatedAt,
+            lastError: job.lastError,
+          },
+        },
+      };
+    },
+  );
 
   // Sanity check para diagnóstico de credenciais antes de cadastrar.
   app.post('/api/v1/controllers/test', { preHandler: app.requireAdmin() }, async (req, reply) => {
