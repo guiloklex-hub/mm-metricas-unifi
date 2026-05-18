@@ -9,6 +9,9 @@ updates:
     groups:
       fastify:
         patterns: ['fastify', '@fastify/*', 'fastify-*']
+        # `fastify-type-provider-zod` 5.x+ exige Zod 4 (breaking change largo).
+        # Ignorado até migrarmos do Zod 3 para 4 deliberadamente.
+        exclude-patterns: ['fastify-type-provider-zod']
       drizzle:
         patterns: ['drizzle-orm', 'drizzle-kit']
       vitest:
@@ -18,6 +21,9 @@ updates:
       types:
         patterns: ['@types/*']
         dependency-type: 'development'
+    ignore:
+      - dependency-name: 'fastify-type-provider-zod'
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: 'chore(deps)'
       include: 'scope'
