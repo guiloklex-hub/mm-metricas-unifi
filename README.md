@@ -1,10 +1,10 @@
-# mm-metricas-unifi
+# metricas-unifi
 
 Coleta, armazenamento e BI de métricas UniFi — self-hosted, multi-controller, multi-site. Open-source.
 
 Construído para resolver um problema concreto: a interface nova do UniFi Network não mostra mais, por antena, contadores de pacotes/descartes/erros/retransmissão que a diretoria pedia em relatório. Esta ferramenta poll-eia controllers UniFi periodicamente (OS Console + Network Application self-hosted), guarda séries temporais em SQLite e oferece dashboards, relatórios CSV/PDF e comparativos entre filiais.
 
-> **Status:** v1.0 estável. Pipeline completo de coleta, BI e relatórios pronto para uso em produção self-hosted. Imagem Docker em `ghcr.io/guiloklex-hub/mm-metricas-unifi:latest`.
+> **Status:** v1.0 estável. Pipeline completo de coleta, BI e relatórios pronto para uso em produção self-hosted. Imagem Docker em `ghcr.io/guiloklex-hub/metricas-unifi:latest`.
 
 ## Funcionalidades planejadas
 
@@ -25,8 +25,8 @@ Node.js 22 · TypeScript · Fastify 5 · Drizzle ORM · better-sqlite3 · Vite +
 ## Quick start (Docker)
 
 ```bash
-git clone https://github.com/guiloklex-hub/mm-metricas-unifi.git
-cd mm-metricas-unifi
+git clone https://github.com/guiloklex-hub/metricas-unifi.git
+cd metricas-unifi
 cp .env.example .env
 
 # Gere segredos:

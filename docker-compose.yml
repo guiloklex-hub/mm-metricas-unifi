@@ -1,9 +1,9 @@
 services:
-  mm-metricas-unifi:
-    image: ghcr.io/guiloklex-hub/mm-metricas-unifi:latest
+  metricas-unifi:
+    image: ghcr.io/guiloklex-hub/metricas-unifi:latest
     # Para build local em vez de pull:
     # build: .
-    container_name: mm-metricas-unifi
+    container_name: metricas-unifi
     restart: unless-stopped
     ports:
       - '3000:3000'

@@ -55,6 +55,6 @@ jobs:
         with:
           context: .
           push: false
-          tags: mm-metricas-unifi:ci
+          tags: metricas-unifi:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max

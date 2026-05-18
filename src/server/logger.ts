@@ -26,7 +26,7 @@ export interface CreateLoggerOptions {
 export function createLogger(opts: CreateLoggerOptions = {}): Logger {
   const baseOpts: LoggerOptions = {
     level: opts.level ?? 'info',
-    name: opts.name ?? 'mm-metricas-unifi',
+    name: opts.name ?? 'metricas-unifi',
     redact: {
       paths: REDACT_PATHS,
       censor: '[REDACTED]',

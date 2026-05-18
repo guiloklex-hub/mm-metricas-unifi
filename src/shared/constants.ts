@@ -8,5 +8,5 @@ export const DEFAULT_RETENTION_1H_DAYS = 365;
 
 export const RADIO_BANDS = ['ng', 'na', '6e'] as const;
 
-export const APP_NAME = 'mm-metricas-unifi';
-export const APP_VERSION = '1.0.0';
+export const APP_NAME = 'metricas-unifi';
+export const APP_VERSION = '1.0.1';

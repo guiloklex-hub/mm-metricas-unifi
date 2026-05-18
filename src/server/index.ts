@@ -12,7 +12,7 @@ async function main(): Promise<void> {
     pretty: env.NODE_ENV === 'development',
   });
 
-  logger.info({ env: env.NODE_ENV, dbPath: env.DATABASE_PATH }, 'iniciando mm-metricas-unifi');
+  logger.info({ env: env.NODE_ENV, dbPath: env.DATABASE_PATH }, 'iniciando metricas-unifi');
 
   const db = createDb({ path: env.DATABASE_PATH });
   runMigrations(db);

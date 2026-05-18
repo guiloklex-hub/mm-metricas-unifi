@@ -24,7 +24,7 @@ export function AppShell({ current, onNavigate, children }: AppShellProps) {
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <div className="flex items-center gap-6">
-            <h1 className="text-base font-bold tracking-tight">mm-metricas-unifi</h1>
+            <h1 className="text-base font-bold tracking-tight">metricas-unifi</h1>
             <nav className="flex items-center gap-1">
               {TABS.map((tab) => (
                 <button

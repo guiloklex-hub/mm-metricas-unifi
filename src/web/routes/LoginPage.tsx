@@ -17,7 +17,7 @@ export function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6 dark:bg-slate-950">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">mm-metricas-unifi</h1>
+          <h1 className="text-2xl font-bold tracking-tight">metricas-unifi</h1>
           <p className="mt-1 text-sm text-slate-500">Entrar como administrador</p>
         </div>
         <Card>

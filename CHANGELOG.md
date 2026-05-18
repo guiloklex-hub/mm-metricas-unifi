@@ -4,6 +4,27 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-05-18
+
+### Changed
+- **Rename do projeto**: `mm-metricas-unifi` → `metricas-unifi` (prefixo
+  organizacional removido). Repositório, container, imagem GHCR e todas as
+  referências internas atualizados. Imagem 1.0.0 antiga continua disponível
+  em `ghcr.io/guiloklex-hub/mm-metricas-unifi:1.0.0` mas não recebe mais
+  atualizações — migre para `ghcr.io/guiloklex-hub/metricas-unifi:latest`.
+  GitHub mantém redirect automático do path antigo (`mm-metricas-unifi`)
+  para o novo nos clones/links externos.
+- **Dependabot hardened**: ignora permanentemente bumps de major do Node
+  base image (manter Node 22 LTS) e `fastify-type-provider-zod` major
+  (bloqueado até migração Zod 3→4).
+
+### Dependencies (rodada pós-1.0.0)
+- Mergeado 16 PRs do Dependabot incluindo majors: argon2 0.41→0.44,
+  ulid 2→3, pino 9→10, vitest 2→4, drizzle-orm 0.36→0.45,
+  @fastify/jwt 9→10, @fastify/static 8→9, @fastify/cookie 10→11,
+  fast-jwt 5→6, croner 9→10, @types/node 22→25 + 5 actions GHA.
+- 90 testes + E2E 24 checks validados em cada major. Sem regressões.
+
 ## [1.0.0] — 2026-05-18
 
 Primeira release estável. Pipeline completo de coleta, armazenamento, BI e

@@ -16,7 +16,7 @@ labels: bug
 
 ## Ambiente
 
-- Versão do mm-metricas-unifi:
+- Versão do metricas-unifi:
 - Node.js (se rodando fora do Docker):
 - SO + arquitetura:
 - Tipo de controller UniFi: [ ] UniFi OS Console  [ ] Network Application self-hosted

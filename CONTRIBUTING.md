@@ -1,4 +1,4 @@
-# Contribuindo com mm-metricas-unifi
+# Contribuindo com metricas-unifi
 
 Obrigado pelo interesse. Este projeto resolve um problema real (BI de Wi-Fi UniFi multi-filial) e cada melhoria importa.
 
@@ -20,7 +20,7 @@ Obrigado pelo interesse. Este projeto resolve um problema real (BI de Wi-Fi UniF
 
 ```bash
 git clone <fork>
-cd mm-metricas-unifi
+cd metricas-unifi
 nvm use
 npm install
 cp .env.example .env

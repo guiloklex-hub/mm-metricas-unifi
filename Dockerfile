@@ -27,10 +27,10 @@ RUN rm -rf node_modules \
 # --- Runtime stage ------------------------------------------------------------
 FROM node:22-alpine AS runner
 
-LABEL org.opencontainers.image.title="mm-metricas-unifi"
+LABEL org.opencontainers.image.title="metricas-unifi"
 LABEL org.opencontainers.image.description="Coleta e BI de métricas UniFi"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.source="https://github.com/guiloklex-hub/mm-metricas-unifi"
+LABEL org.opencontainers.image.source="https://github.com/guiloklex-hub/metricas-unifi"
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \

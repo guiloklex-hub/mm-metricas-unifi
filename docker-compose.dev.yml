@@ -1,7 +1,7 @@
 services:
-  mm-metricas-unifi:
+  metricas-unifi:
     build: .
-    container_name: mm-metricas-unifi-dev
+    container_name: metricas-unifi-dev
     restart: 'no'
     ports:
       - '3000:3000'

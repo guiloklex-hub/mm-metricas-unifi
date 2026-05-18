@@ -3,8 +3,8 @@
 ## Docker (recomendado)
 
 ```bash
-git clone https://github.com/guiloklex-hub/mm-metricas-unifi.git
-cd mm-metricas-unifi
+git clone https://github.com/guiloklex-hub/metricas-unifi.git
+cd metricas-unifi
 cp .env.example .env
 
 echo "MASTER_KEY=$(openssl rand -base64 32)" >> .env
@@ -64,18 +64,18 @@ Recomendado: rodar sob `systemd` ou `pm2`.
 
 ### Exemplo `systemd`
 
-`/etc/systemd/system/mm-metricas-unifi.service`:
+`/etc/systemd/system/metricas-unifi.service`:
 
 ```ini
 [Unit]
-Description=mm-metricas-unifi
+Description=metricas-unifi
 After=network.target
 
 [Service]
 Type=simple
 User=metricas
-WorkingDirectory=/opt/mm-metricas-unifi
-EnvironmentFile=/opt/mm-metricas-unifi/.env
+WorkingDirectory=/opt/metricas-unifi
+EnvironmentFile=/opt/metricas-unifi/.env
 ExecStart=/usr/bin/node --enable-source-maps dist/server/src/server/index.js
 Restart=on-failure
 RestartSec=5
@@ -86,8 +86,8 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now mm-metricas-unifi
-sudo journalctl -u mm-metricas-unifi -f
+sudo systemctl enable --now metricas-unifi
+sudo journalctl -u metricas-unifi -f
 ```
 
 ## Primeiro acesso
@@ -102,7 +102,7 @@ sudo journalctl -u mm-metricas-unifi -f
 Single-process, single-file. Para backup:
 
 ```bash
-docker compose exec mm-metricas-unifi sqlite3 /app/data/app.db ".backup /app/data/backup-$(date +%F).db"
+docker compose exec metricas-unifi sqlite3 /app/data/app.db ".backup /app/data/backup-$(date +%F).db"
 ```
 
 Ou copie a pasta `data/` quando o serviço estiver parado.

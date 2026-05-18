@@ -57,7 +57,7 @@ export function renderMetricsReport(input: PdfReportInput): PDFKit.PDFDocument {
     info: {
       Title: input.title,
       Subject: 'Relatório de métricas UniFi',
-      Creator: 'mm-metricas-unifi',
+      Creator: 'metricas-unifi',
     },
   });
 
@@ -76,7 +76,7 @@ function drawCover(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
   doc
     .font('Helvetica-Bold')
     .fontSize(22)
-    .text('mm-metricas-unifi', { align: 'left' })
+    .text('metricas-unifi', { align: 'left' })
     .moveDown(0.2)
     .font('Helvetica')
     .fontSize(14)

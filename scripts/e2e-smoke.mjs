@@ -4,7 +4,7 @@
  * Smoke E2E: sobe um mock UniFi local, cadastra ele como controller via API,
  * espera worker rodar a coleta e valida que metrics_5m tem amostras.
  *
- * Pressupõe que o servidor mm-metricas-unifi já está rodando em $BASE_URL.
+ * Pressupõe que o servidor metricas-unifi já está rodando em $BASE_URL.
  */
 
 import { createServer } from 'node:http';
