@@ -4,6 +4,25 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-05-18
+
+### Fixed
+- **Exportação de relatórios** (`/api/v1/export/metrics.csv` e
+  `/api/v1/reports/pdf`): downloads chegavam ao navegador como `.txt`
+  porque os handlers escreviam direto em `reply.raw` sem `reply.hijack()`,
+  o que fazia o Node emitir headers padrão antes dos `reply.header()`
+  do Fastify. Agora os handlers fazem `reply.hijack()` + definem
+  `Content-Type` e `Content-Disposition` via `reply.raw.setHeader()`,
+  garantindo que o navegador receba o nome correto (`mm-metricas_*.csv`
+  / `.pdf`) e o MIME type adequado.
+
+### Operations
+- **Docker volume com SELinux**: `docker-compose.yml` agora monta
+  `./data:/app/data:Z` para que o Fedora/RHEL relabele o bind mount
+  com `container_file_t`. Sem isso, SELinux enforcing bloqueia a
+  escrita em `/app/data/app.db` e o container entra em loop de restart
+  com `SqliteError: unable to open database file`.
+
 ## [1.0.1] — 2026-05-18
 
 ### Changed

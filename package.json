@@ -1,6 +1,6 @@
 {
   "name": "metricas-unifi",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": false,
   "description": "Coleta, armazenamento e BI de métricas UniFi (multi-controller, multi-site) — open-source, self-hosted.",
   "license": "MIT",
