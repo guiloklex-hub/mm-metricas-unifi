@@ -1,5 +1,5 @@
-import PDFDocument from 'pdfkit';
 import type { Granularity } from '@shared/schemas/metrics.ts';
+import PDFDocument from 'pdfkit';
 
 /**
  * Relatório PDF executivo. Sem gráfico (chega em iteração futura via SVG
@@ -114,10 +114,7 @@ function drawTotals(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
       'Taxa de retransmissão',
       formatRate(safeRate(input.totals.totalRetries, input.totals.totalPackets)),
     ],
-    [
-      'Taxa de erros',
-      formatRate(safeRate(input.totals.totalErrors, input.totals.totalPackets)),
-    ],
+    ['Taxa de erros', formatRate(safeRate(input.totals.totalErrors, input.totals.totalPackets))],
     [
       'Taxa de descarte',
       formatRate(safeRate(input.totals.totalDropped, input.totals.totalPackets)),
@@ -132,7 +129,12 @@ function drawTotals(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
 
 function drawDeviceTable(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
   doc.font('Helvetica-Bold').fontSize(16).text('Por AP').moveDown(0.5);
-  const cols: Array<{ key: keyof PdfReportInput['deviceSummary'][number]; label: string; width: number; align?: 'left' | 'right' }> = [
+  const cols: Array<{
+    key: keyof PdfReportInput['deviceSummary'][number];
+    label: string;
+    width: number;
+    align?: 'left' | 'right';
+  }> = [
     { key: 'deviceLabel', label: 'AP', width: 140 },
     { key: 'samples', label: 'Amostras', width: 60, align: 'right' },
     { key: 'totalBytes', label: 'Bytes', width: 90, align: 'right' },
@@ -151,7 +153,10 @@ function drawDeviceTable(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
     x += c.width;
   }
   y += 16;
-  doc.moveTo(startX, y - 4).lineTo(startX + cols.reduce((acc, c) => acc + c.width, 0), y - 4).stroke('#999');
+  doc
+    .moveTo(startX, y - 4)
+    .lineTo(startX + cols.reduce((acc, c) => acc + c.width, 0), y - 4)
+    .stroke('#999');
 
   doc.font('Helvetica').fontSize(10);
   for (const row of input.deviceSummary) {

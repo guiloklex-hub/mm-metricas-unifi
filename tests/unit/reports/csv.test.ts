@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { csvField, csvRow, metricRowToCsv } from '@server/reports/csv.ts';
+import { describe, expect, it } from 'vitest';
 
 describe('csvField', () => {
   it('strings simples sem aspas', () => {
