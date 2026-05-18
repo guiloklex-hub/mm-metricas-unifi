@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # --- Build stage --------------------------------------------------------------
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ RUN rm -rf node_modules \
  && npm cache clean --force
 
 # --- Runtime stage ------------------------------------------------------------
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 
 LABEL org.opencontainers.image.title="mm-metricas-unifi"
 LABEL org.opencontainers.image.description="Coleta e BI de métricas UniFi"
