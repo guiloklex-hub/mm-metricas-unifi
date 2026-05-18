@@ -46,9 +46,10 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
     const fromIso = new Date(q.from * 1000).toISOString().slice(0, 10);
     const toIso = new Date(q.to * 1000).toISOString().slice(0, 10);
     const filename = `mm-metricas_${fromIso}_${toIso}.csv`;
-    reply.header('content-type', 'text/csv; charset=utf-8');
-    reply.header('content-disposition', `attachment; filename="${filename}"`);
-    reply.header('cache-control', 'no-store');
+    reply.hijack();
+    reply.raw.setHeader('content-type', 'text/csv; charset=utf-8');
+    reply.raw.setHeader('content-disposition', `attachment; filename="${filename}"`);
+    reply.raw.setHeader('cache-control', 'no-store');
 
     // Streaming linha-a-linha para não materializar tudo em memória.
     reply.raw.write(METRIC_CSV_HEADER);
@@ -69,7 +70,6 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       reply.raw.write(metricRowToCsv(r));
     }
     reply.raw.end();
-    return reply;
   });
 
   app.post('/api/v1/reports/pdf', { preHandler: app.requireAdmin() }, async (req, reply) => {
@@ -177,9 +177,10 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
     const toIso = new Date(q.to * 1000).toISOString().slice(0, 10);
     const filename = `mm-metricas_${fromIso}_${toIso}.pdf`;
 
-    reply.header('content-type', 'application/pdf');
-    reply.header('content-disposition', `attachment; filename="${filename}"`);
-    reply.header('cache-control', 'no-store');
+    reply.hijack();
+    reply.raw.setHeader('content-type', 'application/pdf');
+    reply.raw.setHeader('content-disposition', `attachment; filename="${filename}"`);
+    reply.raw.setHeader('cache-control', 'no-store');
 
     const pdf = renderMetricsReport({
       title: `Relatório ${fromIso} → ${toIso}`,
@@ -192,7 +193,10 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       deviceSummary,
       totals,
     });
-    pdf.pipe(reply.raw);
-    return reply;
+    await new Promise<void>((resolve, reject) => {
+      pdf.on('end', resolve);
+      pdf.on('error', reject);
+      pdf.pipe(reply.raw);
+    });
   });
 }
