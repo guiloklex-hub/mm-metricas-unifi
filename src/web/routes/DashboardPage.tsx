@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useControllers } from '../api/queries/controllers.ts';
 import { useMetricsRecent, useMetricsStatus } from '../api/queries/metrics.ts';
+import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeatmap.tsx';
 import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/TimeSeriesChart.tsx';
 import { Card } from '../components/ui/Card.tsx';
 import { formatBytes, formatNumber, formatRate, formatRelative } from '../lib/format.ts';
@@ -27,6 +28,13 @@ export function DashboardPage() {
 
   const series = useMemo(() => groupSeries(recent.data?.rows ?? []), [recent.data]);
   const tableRows = useMemo(() => summarizeDevices(recent.data?.rows ?? []), [recent.data]);
+  const heatmapCells = useMemo<HeatmapCell[]>(
+    () =>
+      (recent.data?.rows ?? [])
+        .filter((r) => r.deviceId !== null && r.radio === null && r.clientMac === null)
+        .map((r) => ({ ts: r.ts, value: r.retryRate })),
+    [recent.data],
+  );
 
   return (
     <div className="space-y-6">
@@ -92,6 +100,16 @@ export function DashboardPage() {
             yLabel="Bytes / janela"
             formatY={(v) => formatBytes(v)}
           />
+        )}
+      </Card>
+
+      <Card title="Taxa de retransmissão — hora × dia">
+        {heatmapCells.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Sem amostras suficientes na janela selecionada para o heatmap.
+          </p>
+        ) : (
+          <HourlyHeatmap cells={heatmapCells} formatValue={(v) => formatRate(v)} />
         )}
       </Card>
 

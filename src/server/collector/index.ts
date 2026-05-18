@@ -2,6 +2,8 @@ import type { DB } from '@server/db/client.ts';
 import type { Logger } from 'pino';
 import { UnifiClientPool } from './clients-pool.ts';
 import { type CollectJobPayload, runCollectJob } from './jobs/collect.ts';
+import { runRetention } from './jobs/retention.ts';
+import { runRollup1d, runRollup1h } from './jobs/rollup.ts';
 import { JobQueue } from './queue.ts';
 import { Scheduler } from './scheduler.ts';
 import { Worker } from './worker.ts';
@@ -17,9 +19,17 @@ export interface BuildCollectorOptions {
   db: DB;
   logger: Logger;
   masterKey: string;
+  retention5mDays: number;
+  retention1hDays: number;
 }
 
-export function buildCollector({ db, logger, masterKey }: BuildCollectorOptions): CollectorRuntime {
+export function buildCollector({
+  db,
+  logger,
+  masterKey,
+  retention5mDays,
+  retention1hDays,
+}: BuildCollectorOptions): CollectorRuntime {
   const queue = new JobQueue(db);
   const pool = new UnifiClientPool(db, logger, masterKey);
   const worker = new Worker(queue, logger);
@@ -36,15 +46,14 @@ export function buildCollector({ db, logger, masterKey }: BuildCollectorOptions)
     }
   });
 
-  // Handlers de M2 (rollup/retention) ficam registrados aqui em commits futuros.
   worker.register('rollup_1h', async () => {
-    logger.debug('rollup_1h ainda não implementado (M2)');
+    await runRollup1h(db, logger);
   });
   worker.register('rollup_1d', async () => {
-    logger.debug('rollup_1d ainda não implementado (M2)');
+    await runRollup1d(db, logger);
   });
   worker.register('retention', async () => {
-    logger.debug('retention ainda não implementado (M2)');
+    await runRetention(db, logger, { retention5mDays, retention1hDays });
   });
   worker.register('bootstrap_controller', async () => {
     logger.debug('bootstrap_controller — disparado pela rota de criação');

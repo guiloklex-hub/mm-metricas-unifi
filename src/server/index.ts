@@ -18,7 +18,13 @@ async function main(): Promise<void> {
   runMigrations(db);
   logger.info('migrations aplicadas');
 
-  const collector = buildCollector({ db, logger, masterKey: env.MASTER_KEY });
+  const collector = buildCollector({
+    db,
+    logger,
+    masterKey: env.MASTER_KEY,
+    retention5mDays: env.RETENTION_5M_DAYS,
+    retention1hDays: env.RETENTION_1H_DAYS,
+  });
   await startCollector(collector);
 
   const app = await buildApp({

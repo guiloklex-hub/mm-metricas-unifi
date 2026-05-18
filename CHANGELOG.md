@@ -4,6 +4,27 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — M2 (Rollup + retention + heatmap)
+- **Rollup 5min → 1h e 1h → 1d** com `INSERT ... ON CONFLICT DO UPDATE`
+  (idempotente). Agregação: AVG no client_count, MAX nos snapshots acumulados,
+  SUM nos deltas, recálculo de taxas a partir dos somatórios para preservar
+  peso por tráfego.
+- **Job `rollup_1h`** cobre os últimos 3 buckets horários (recuperação caso
+  execuções anteriores tenham falhado).
+- **Job `rollup_1d`** roda às 00:10 UTC cobrindo os 2 dias anteriores.
+- **Job `retention`** purga `metrics_5m` > 30d e `metrics_1h` > 365d com
+  `PRAGMA optimize` no final. Configurável via `RETENTION_5M_DAYS` e
+  `RETENTION_1H_DAYS`.
+- **Heatmap calendar hora × dia-da-semana** no dashboard mostrando taxa de
+  retransmissão média por slot (ECharts heatmap + visualMap).
+- 5 testes integração de rollup (agregação, idempotência, janela exclusiva,
+  rollup diário, purge) — total **80 testes verdes**.
+
+### Changed — M2
+- `buildCollector` agora aceita `retention5mDays` e `retention1hDays`.
+- Handlers `rollup_1h`, `rollup_1d` e `retention` deixam de ser stubs e
+  fazem o trabalho real.
+
 ### Added — M1 (MVP de coleta)
 - **Coletor UniFi end-to-end**: parser de payloads (`stat/device`, `stat/sta`,
   `self/sites`) produzindo amostras por site, AP, rádio (ng/na/6e) e cliente.
