@@ -12,6 +12,7 @@ import { registerAuthRoutes } from './routes/auth.ts';
 import { registerControllerRoutes } from './routes/controllers.ts';
 import { registerHealthz } from './routes/healthz.ts';
 import { registerMetricsRoutes } from './routes/metrics.ts';
+import { registerReportRoutes } from './routes/reports.ts';
 import { registerSiteRoutes } from './routes/sites.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   });
   await registerSiteRoutes(app, opts.db);
   await registerMetricsRoutes(app, opts.db);
+  await registerReportRoutes(app, opts.db);
 
   const staticDir = opts.staticDir ?? resolve(__dirname, '../../../dist/web');
   const hasStatic = existsSync(staticDir);

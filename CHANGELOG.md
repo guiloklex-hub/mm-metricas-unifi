@@ -4,6 +4,21 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — M3 (Relatórios CSV + PDF)
+- **Export CSV streaming** via `GET /api/v1/export/metrics.csv?from=&to=&...`
+  com RFC 4180 (escape de aspas, vírgulas, newlines), Content-Disposition
+  attachment com filename e janela máxima de 1 ano. Stream linha-a-linha
+  sem materializar em memória.
+- **Geração de PDF** via `POST /api/v1/reports/pdf` com PDFKit: capa com
+  metadados (período, controller, site, granularidade, geração),
+  totais agregados (bytes/pacotes/dropped/errors/retries + taxas), tabela
+  ordenada por uso por AP. Janela máxima 90 dias.
+- **UI: aba Relatórios** com seletor de período (24h/7d/30d/90d/custom),
+  filtros por controller e site, download direto de CSV e PDF.
+- 10 testes do gerador CSV (escape, null/undefined, ISO timestamp).
+- Smoke E2E estendido valida CSV (22 linhas + cabeçalho) e PDF (magic bytes
+  `%PDF`, 2966 bytes) — total **90 testes verdes**.
+
 ### Added — M2 (Rollup + retention + heatmap)
 - **Rollup 5min → 1h e 1h → 1d** com `INSERT ... ON CONFLICT DO UPDATE`
   (idempotente). Agregação: AVG no client_count, MAX nos snapshots acumulados,

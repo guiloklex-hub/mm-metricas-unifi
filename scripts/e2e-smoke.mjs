@@ -162,7 +162,33 @@ async function main() {
     `sites sincronizados (${sites.json.data.length})`,
   );
 
-  // 9) Cleanup
+  // 9) Exportar CSV
+  const now = Math.floor(Date.now() / 1000);
+  const from = now - 3600;
+  const csvRes = await fetch(
+    `${BASE_URL}/api/v1/export/metrics.csv?from=${from}&to=${now}`,
+    { headers: cookieJar ? { cookie: cookieJar } : {} },
+  );
+  assert(csvRes.status === 200, 'CSV HTTP 200');
+  const csvText = await csvRes.text();
+  const csvLines = csvText.trim().split('\n');
+  assert(csvLines[0].startsWith('ts,timestamp_utc,controller_id'), 'CSV cabeçalho correto');
+  assert(csvLines.length > 1, `CSV tem ${csvLines.length - 1} linhas de dados`);
+
+  // 10) Gerar PDF
+  const pdfRes = await fetch(`${BASE_URL}/api/v1/reports/pdf`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookieJar ? { cookie: cookieJar } : {}),
+    },
+    body: JSON.stringify({ from, to: now }),
+  });
+  assert(pdfRes.status === 200, 'PDF HTTP 200');
+  const pdfBuf = Buffer.from(await pdfRes.arrayBuffer());
+  assert(pdfBuf.slice(0, 4).toString() === '%PDF', `PDF magic bytes válidos (${pdfBuf.length} bytes)`);
+
+  // 11) Cleanup
   const del = await api(`/api/v1/controllers/${create.json.data.id}`, { method: 'DELETE' });
   assert(del.status === 204, 'controller removido');
 

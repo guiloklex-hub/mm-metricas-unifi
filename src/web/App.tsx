@@ -4,6 +4,7 @@ import { AppShell, type Route } from './components/layout/AppShell.tsx';
 import { ControllersPage } from './routes/ControllersPage.tsx';
 import { DashboardPage } from './routes/DashboardPage.tsx';
 import { LoginPage } from './routes/LoginPage.tsx';
+import { ReportsPage } from './routes/ReportsPage.tsx';
 import { SettingsPage } from './routes/SettingsPage.tsx';
 import { SetupPage } from './routes/SetupPage.tsx';
 
@@ -30,6 +31,7 @@ export function App() {
 
   let content: React.ReactNode;
   if (route === 'controllers') content = <ControllersPage />;
+  else if (route === 'reports') content = <ReportsPage />;
   else if (route === 'settings') content = <SettingsPage />;
   else content = <DashboardPage />;
 
