@@ -1,0 +1,17 @@
+services:
+  mm-metricas-unifi:
+    build: .
+    container_name: mm-metricas-unifi-dev
+    restart: 'no'
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /app/data/app.db
+      LOG_LEVEL: debug
+      MASTER_KEY: ${MASTER_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ./data:/app/data

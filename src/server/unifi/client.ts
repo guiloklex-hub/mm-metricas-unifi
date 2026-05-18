@@ -1,0 +1,237 @@
+import type { Logger } from 'pino';
+import { Agent, request } from 'undici';
+import { type DetectFetcher, detectVariant } from './detect.ts';
+import {
+  loginPath,
+  selfSitesPath,
+  statDevicePath,
+  statHealthPath,
+  statStaPath,
+} from './endpoints.ts';
+import type {
+  ControllerVariant,
+  UnifiAuth,
+  UnifiClientPayload,
+  UnifiControllerConfig,
+  UnifiDevicePayload,
+  UnifiSitePayload,
+} from './types.ts';
+
+export class UnifiClientError extends Error {
+  override readonly name = 'UnifiClientError';
+  constructor(
+    message: string,
+    readonly statusCode?: number,
+  ) {
+    super(message);
+  }
+}
+
+interface Session {
+  cookie: string;
+  csrf: string | null;
+  expiresAt: number;
+}
+
+/**
+ * Cliente HTTP por controller UniFi. Uma instância por controller (estado de sessão
+ * isolado). Suporta:
+ *   - Auth via API Key (preferida, stateless) ou login local com cookie + CSRF.
+ *   - Detecção automática de variant (UniFi OS vs Classic) com persistência.
+ *   - Retry-on-401 com mutex de re-login (evita stampede em sessão expirada).
+ *   - TLS auto-assinado opt-in (`insecureTls`).
+ *
+ * Esqueleto. Implementação completa de fetchDevices/fetchSites/fetchClients será
+ * preenchida em M1 — aqui já temos a estrutura, getters e ensureSession.
+ */
+export class UnifiClient {
+  private variant: ControllerVariant | null;
+  private session: Session | null = null;
+  private readonly dispatcher: Agent;
+  private readonly logger: Logger;
+  private readonly loginMutex = new Mutex();
+
+  constructor(
+    private readonly config: UnifiControllerConfig,
+    logger: Logger,
+  ) {
+    this.variant = config.variant;
+    this.dispatcher = new Agent({
+      connect: { rejectUnauthorized: !config.insecureTls },
+    });
+    this.logger = logger.child({ controllerId: config.id, baseUrl: config.baseUrl });
+  }
+
+  async close(): Promise<void> {
+    await this.dispatcher.close();
+  }
+
+  get currentVariant(): ControllerVariant | null {
+    return this.variant;
+  }
+
+  /**
+   * Garante que `variant` está descoberto e que há sessão válida (no caso de auth local).
+   * API Key não precisa de sessão.
+   */
+  async ensureReady(): Promise<void> {
+    if (!this.variant) {
+      const detected = await detectVariant(this.config.baseUrl, defaultFetcher, this.dispatcher);
+      this.variant = detected.variant;
+      this.logger.debug(
+        { variant: detected.variant, signals: detected.signals },
+        'variant detectado',
+      );
+    }
+    if (this.config.auth.mode === 'local' && !this.isSessionValid()) {
+      await this.loginMutex.run(() => this.login());
+    }
+  }
+
+  private isSessionValid(): boolean {
+    return !!this.session && this.session.expiresAt > Date.now() + 60_000;
+  }
+
+  private async login(): Promise<void> {
+    if (this.config.auth.mode !== 'local') return;
+    const variant = this.variant ?? 'classic';
+    const url = joinUrl(this.config.baseUrl, loginPath(variant));
+    const res = await request(url, {
+      method: 'POST',
+      dispatcher: this.dispatcher,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        username: this.config.auth.username,
+        password: this.config.auth.password,
+        remember: true,
+      }),
+    });
+    if (res.statusCode >= 400) {
+      throw new UnifiClientError(`Login falhou (${res.statusCode})`, res.statusCode);
+    }
+    const setCookie = res.headers['set-cookie'];
+    const cookie = Array.isArray(setCookie) ? setCookie.join('; ') : (setCookie ?? '');
+    const csrfHeader = res.headers['x-csrf-token'];
+    const csrf = Array.isArray(csrfHeader) ? (csrfHeader[0] ?? null) : (csrfHeader ?? null);
+    this.session = {
+      cookie,
+      csrf,
+      expiresAt: Date.now() + 90 * 60 * 1000, // 90min de margem (cookie real ~2h)
+    };
+    this.logger.debug('login bem-sucedido');
+    // Consome o body para liberar a conexão.
+    await res.body.text();
+  }
+
+  /* ----------- métodos de coleta (esqueleto) -----------
+   *
+   * Implementação completa em M1. Aqui já temos a forma e a chamada autenticada.
+   */
+
+  async fetchSites(): Promise<UnifiSitePayload[]> {
+    await this.ensureReady();
+    const url = joinUrl(this.config.baseUrl, selfSitesPath(this.variant));
+    const body = await this.authedGet(url);
+    return (body.data ?? []) as UnifiSitePayload[];
+  }
+
+  async fetchDevices(siteName: string): Promise<UnifiDevicePayload[]> {
+    await this.ensureReady();
+    const url = joinUrl(this.config.baseUrl, statDevicePath(this.variant, siteName));
+    const body = await this.authedGet(url);
+    return (body.data ?? []) as UnifiDevicePayload[];
+  }
+
+  async fetchClients(siteName: string): Promise<UnifiClientPayload[]> {
+    await this.ensureReady();
+    const url = joinUrl(this.config.baseUrl, statStaPath(this.variant, siteName));
+    const body = await this.authedGet(url);
+    return (body.data ?? []) as UnifiClientPayload[];
+  }
+
+  async fetchHealth(siteName: string): Promise<unknown> {
+    await this.ensureReady();
+    const url = joinUrl(this.config.baseUrl, statHealthPath(this.variant, siteName));
+    const body = await this.authedGet(url);
+    return body.data;
+  }
+
+  private async authedGet(url: string): Promise<{ data?: unknown[] }> {
+    const headers = this.buildAuthHeaders();
+    let res = await request(url, { method: 'GET', dispatcher: this.dispatcher, headers });
+    if (res.statusCode === 401 && this.config.auth.mode === 'local') {
+      await res.body.text();
+      this.session = null;
+      await this.loginMutex.run(() => this.login());
+      res = await request(url, {
+        method: 'GET',
+        dispatcher: this.dispatcher,
+        headers: this.buildAuthHeaders(),
+      });
+    }
+    if (res.statusCode >= 400) {
+      await res.body.text();
+      throw new UnifiClientError(`GET ${url} retornou ${res.statusCode}`, res.statusCode);
+    }
+    const text = await res.body.text();
+    const parsed = text ? (JSON.parse(text) as { data?: unknown[] }) : {};
+    return parsed;
+  }
+
+  private buildAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      accept: 'application/json',
+    };
+    if (this.config.auth.mode === 'api-key') {
+      headers['x-api-key'] = this.config.auth.apiKey;
+      return headers;
+    }
+    if (this.session) {
+      headers.cookie = this.session.cookie;
+      if (this.session.csrf) headers['x-csrf-token'] = this.session.csrf;
+    }
+    return headers;
+  }
+}
+
+export function buildAuth(input: {
+  authMode: 'api-key' | 'local';
+  apiKey?: string;
+  username?: string;
+  password?: string;
+}): UnifiAuth {
+  if (input.authMode === 'api-key') {
+    if (!input.apiKey) throw new Error('apiKey é obrigatório para authMode=api-key');
+    return { mode: 'api-key', apiKey: input.apiKey };
+  }
+  if (!input.username || !input.password) {
+    throw new Error('username e password são obrigatórios para authMode=local');
+  }
+  return { mode: 'local', username: input.username, password: input.password };
+}
+
+/* ----- helpers ----- */
+
+class Mutex {
+  private chain: Promise<unknown> = Promise.resolve();
+  run<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.chain.then(() => fn());
+    this.chain = next.catch(() => undefined);
+    return next;
+  }
+}
+
+function joinUrl(base: string, suffix: string): string {
+  const b = base.endsWith('/') ? base.slice(0, -1) : base;
+  const s = suffix.startsWith('/') ? suffix : `/${suffix}`;
+  return `${b}${s}`;
+}
+
+const defaultFetcher: DetectFetcher = async (url, init) => {
+  const res = await request(url, init);
+  await res.body.text();
+  return {
+    statusCode: res.statusCode,
+    headers: res.headers as Record<string, string | string[] | undefined>,
+  };
+};

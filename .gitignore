@@ -1,0 +1,40 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+.turbo/
+
+# Data and runtime
+data/*
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+reports/
+
+# Env and secrets
+.env
+.env.local
+.env.*.local
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Playwright
+playwright-report/
+test-results/
+
+# Generated
+src/web/routeTree.gen.ts

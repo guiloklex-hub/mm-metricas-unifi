@@ -1,0 +1,28 @@
+services:
+  mm-metricas-unifi:
+    image: ghcr.io/guiloklex-hub/mm-metricas-unifi:latest
+    # Para build local em vez de pull:
+    # build: .
+    container_name: mm-metricas-unifi
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /app/data/app.db
+      LOG_LEVEL: info
+      MASTER_KEY: ${MASTER_KEY:?Defina MASTER_KEY no .env (openssl rand -base64 32)}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env (openssl rand -base64 64)}
+      DEFAULT_POLL_SECONDS: 300
+      RETENTION_5M_DAYS: 30
+      RETENTION_1H_DAYS: 365
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
