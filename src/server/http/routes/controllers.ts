@@ -170,8 +170,18 @@ export async function registerControllerRoutes(
   // Sanity check para diagnóstico de credenciais antes de cadastrar.
   app.post('/api/v1/controllers/test', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const input = controllerCreateInputSchema.parse(req.body);
+    const urlCheck = validateControllerUrl(input.baseUrl);
+    if (!urlCheck.ok) {
+      reply.code(400).send({ ok: false, error: 'invalid_base_url', message: urlCheck.reason });
+      return;
+    }
     const { Agent, request } = await import('undici');
-    const dispatcher = new Agent({ connect: { rejectUnauthorized: !input.insecureTls } });
+    // Timeouts curtos para evitar hang em hosts que aceitam mas não respondem.
+    const dispatcher = new Agent({
+      connect: { rejectUnauthorized: !input.insecureTls, timeout: 5000 },
+      headersTimeout: 8000,
+      bodyTimeout: 10000,
+    });
     const url = `${input.baseUrl.replace(/\/+$/, '')}${
       input.variant === 'unifi-os' ? '/api/auth/login' : '/api/login'
     }`;
@@ -198,15 +208,50 @@ export async function registerControllerRoutes(
         },
       });
     } catch (err) {
-      reply.code(422).send({
-        ok: false,
-        error: 'unreachable',
-        message: err instanceof Error ? err.message : String(err),
-      });
+      // Não devolver err.message cru: pode vazar topologia interna em
+      // ambientes onde o admin é compromissado (XSS via outro caminho).
+      reply.code(422).send({ ok: false, error: 'unreachable' });
     } finally {
       await dispatcher.close();
     }
   });
+}
+
+/**
+ * Valida que `baseUrl` aponta para um controller UniFi remoto, recusando
+ * SSRF para hostnames internos (localhost, link-local, RFC1918) e protocolos
+ * não-HTTP. Em ambientes onde o controller fica na rede privada e essa
+ * proteção precisa ser desligada, basta exportar `ALLOW_LOCAL_CONTROLLER=1`.
+ */
+function validateControllerUrl(raw: string): { ok: true } | { ok: false; reason: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return { ok: false, reason: 'URL inválida' };
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { ok: false, reason: 'Apenas http(s) é aceito' };
+  }
+  if (process.env.ALLOW_LOCAL_CONTROLLER === '1') return { ok: true };
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+    return { ok: false, reason: 'Hostname local bloqueado (exporte ALLOW_LOCAL_CONTROLLER=1)' };
+  }
+  // Link-local AWS/GCP metadata.
+  if (host.startsWith('169.254.') || host.startsWith('fe80:')) {
+    return { ok: false, reason: 'Hostname de link-local/metadata bloqueado' };
+  }
+  // RFC1918 mais comuns — usuários self-hosted geralmente têm IP privado.
+  // Mesmo assim, queremos o opt-in explícito para evitar SSRF acidental.
+  if (
+    host.startsWith('10.') ||
+    host.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  ) {
+    return { ok: false, reason: 'IP privado bloqueado (exporte ALLOW_LOCAL_CONTROLLER=1)' };
+  }
+  return { ok: true };
 }
 
 function detectVariantHint(res: {

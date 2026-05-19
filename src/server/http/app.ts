@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import fastifyHelmet from '@fastify/helmet';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import type { JobQueue } from '@server/collector/queue.ts';
@@ -37,6 +38,15 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   });
 
   registerErrorHandler(app);
+
+  // Security headers — single-admin SaaS self-hosted, sem CSP por enquanto
+  // (Vite gera scripts/styles inline em prod e exigiria nonce-per-request).
+  // HSTS, frameguard, noSniff, referrer-policy etc cobrem o essencial.
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    hsts: { maxAge: 31536000, includeSubDomains: true },
+  });
 
   await app.register(authPlugin, { jwtSecret: opts.jwtSecret });
   await app.register(fastifyRateLimit, {

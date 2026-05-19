@@ -52,7 +52,7 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
   app.post(
     '/api/v1/auth/login',
     {
-      config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+      config: { rateLimit: { max: 3, timeWindow: '15 minutes' } },
     },
     async (req, reply) => {
       const input = loginInputSchema.parse(req.body);
