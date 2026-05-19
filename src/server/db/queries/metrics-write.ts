@@ -227,13 +227,19 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
 
       if (detectReset(s, last)) resetSignals += 1;
 
-      // retry_rate agora usa wifi_tx_attempts como denominador (mais preciso).
-      // Fallback para d_tx_packets quando o firmware não expõe attempts —
-      // mantém compat com fixtures antigas.
-      const retryDenominator = dWifiTxAttempts ?? dTxPackets;
-      const retryRate = rate(dTxRetries, retryDenominator);
-      const errorRate = rate(dTxErrors, dTxPackets);
-      const dropRate = rate(dTxDropped, dTxPackets);
+      // Todas as taxas usam wifi_tx_attempts como denominador (denominador
+      // semanticamente correto: conta TODAS as tentativas de envio, com ou
+      // sem sucesso). Antes usávamos tx_packets para error/drop, mas no
+      // UniFi tx_errors pode ser > tx_packets em janelas curtas (errors
+      // inclui retransmissões e tentativas internas) — produzia taxas
+      // matematicamente impossíveis (>100%) em alguns APs.
+      //
+      // Fallback para tx_packets quando attempts não vier (firmwares antigos),
+      // aceitando o risco de overshoot ocasional vs perder o dado.
+      const denom = dWifiTxAttempts ?? dTxPackets;
+      const retryRate = clampRate(rate(dTxRetries, denom));
+      const errorRate = clampRate(rate(dTxErrors, denom));
+      const dropRate = clampRate(rate(dTxDropped, denom));
 
       upsertMetric.run(
         s.ts,
@@ -294,6 +300,20 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
 
   tx(samples);
   return { inserted, resetSignals };
+}
+
+/**
+ * Garante que taxa fique no domínio [0, 1]. Mesmo com `wifi_tx_attempts` como
+ * denominador, valores ligeiramente acima de 1 podem aparecer em janelas onde
+ * o counter `attempts` ainda não foi atualizado mas `errors`/`retries` já. É
+ * raro mas tratamos para o Dashboard nunca exibir taxa > 100%.
+ */
+function clampRate(v: number | null): number | null {
+  if (v === null) return null;
+  if (!Number.isFinite(v)) return null;
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
 }
 
 function detectReset(s: MetricSampleInput, last: Partial<Record<MetricName, number>>): boolean {

@@ -4,6 +4,35 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Fixed — taxas matematicamente impossíveis (>100%) corrigidas
+
+Bug duplo descoberto pelo usuário ao auditar o PDF: alguns APs apareciam
+com `Erro %: 334.38%` ou `95.36%` quando a aritmética simples
+(`errors/packets`) daria 65% e 30% respectivamente.
+
+**Causa raiz 1** — denominador errado em `metrics-write.ts` e `rollup.ts`:
+- `error_rate` / `drop_rate` usavam `tx_packets` como denominador.
+- Mas no UniFi, `tx_errors` conta também retransmissões e tentativas
+  internas que `tx_packets` não conta — `tx_errors > tx_packets` é
+  possível em janelas curtas, gerando taxas > 100% (impossível em "%").
+- Correção: usar `wifi_tx_attempts` (denominador semanticamente correto,
+  conta TODAS as tentativas de envio). Já era usado para `retry_rate`,
+  agora estendido para `error_rate` e `drop_rate` também. Fallback para
+  `tx_packets` em firmwares antigos. Adicionado `clampRate` no upsert
+  pra garantir que taxa nunca passe de 100% mesmo se denominador atrasar.
+
+**Causa raiz 2** — agregação errada no PDF e Dashboard:
+- O handler do PDF e o `summarizeDevices` do Dashboard calculavam taxas
+  agregadas como **média aritmética dos rates por amostra** (1/N × Σ
+  rate_i). Isso é estatisticamente errado para ratios — uma amostra de
+  5min com 100 packets e 95 erros (95%) pesava igual a uma de 1M packets
+  e 100 erros (0.01%), inflando a média.
+- Correção: cálculo como `SUM(N) / SUM(D)` — média ponderada pelo
+  tráfego real. Reflete a taxa "verdadeira" do AP no período.
+
+Resultado: taxas no PDF e Dashboard agora consistentes, semanticamente
+corretas e nunca > 100%. 2 testes novos cobrem regressão.
+
 ### Fixed — bugs visuais e dados desatualizados no PDF
 - **Sobreposição de linhas no PDF** corrigida: cada linha da tabela "Por AP"
   agora calcula altura real via `doc.heightOfString`, então labels longos

@@ -197,16 +197,12 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       totalPackets: number;
       totalDropped: number;
       totalErrors: number;
+      totalRetries: number;
+      totalAttempts: number;
       totalRxBytes: number;
       totalRxDropped: number;
       totalRxErrors: number;
       lastUptimeSec: number | null;
-      _retrySum: number;
-      _retryN: number;
-      _errSum: number;
-      _errN: number;
-      _dropSum: number;
-      _dropN: number;
       _cpuSum: number;
       _cpuN: number;
       _memSum: number;
@@ -237,16 +233,12 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
           totalPackets: 0,
           totalDropped: 0,
           totalErrors: 0,
+          totalRetries: 0,
+          totalAttempts: 0,
           totalRxBytes: 0,
           totalRxDropped: 0,
           totalRxErrors: 0,
           lastUptimeSec: null,
-          _retrySum: 0,
-          _retryN: 0,
-          _errSum: 0,
-          _errN: 0,
-          _dropSum: 0,
-          _dropN: 0,
           _cpuSum: 0,
           _cpuN: 0,
           _memSum: 0,
@@ -259,21 +251,11 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       cur.totalPackets += r.dTxPackets ?? 0;
       cur.totalDropped += r.dTxDropped ?? 0;
       cur.totalErrors += r.dTxErrors ?? 0;
+      cur.totalRetries += r.dTxRetries ?? 0;
+      cur.totalAttempts += r.dWifiTxAttempts ?? 0;
       cur.totalRxBytes += r.dRxBytes ?? 0;
       cur.totalRxDropped += r.dRxDropped ?? 0;
       cur.totalRxErrors += r.dRxErrors ?? 0;
-      if (r.retryRate != null) {
-        cur._retrySum += r.retryRate;
-        cur._retryN += 1;
-      }
-      if (r.errorRate != null) {
-        cur._errSum += r.errorRate;
-        cur._errN += 1;
-      }
-      if (r.dropRate != null) {
-        cur._dropSum += r.dropRate;
-        cur._dropN += 1;
-      }
       if (r.cpuPct != null) {
         cur._cpuSum += r.cpuPct;
         cur._cpuN += 1;
@@ -297,24 +279,33 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       totals.totalRxErrors += r.dRxErrors ?? 0;
     }
 
+    // Taxas calculadas como SUM(N) / SUM(D) — ponderação pelo tráfego real.
+    // Antes era média aritmética dos rates por amostra (1/N × Σ rate_i), o
+    // que falsamente inflava o número quando havia amostras com baixo
+    // tráfego e taxa alta. Denominador prefere wifi_tx_attempts (mais
+    // robusto: tx_errors pode ser > tx_packets em UniFi).
+    const ratio = (num: number, denom: number) => (denom > 0 ? num / denom : null);
     const deviceSummary = [...agg.values()]
-      .map((d) => ({
-        deviceLabel: d.deviceLabel,
-        samples: d.samples,
-        totalBytes: d.totalBytes,
-        totalPackets: d.totalPackets,
-        totalDropped: d.totalDropped,
-        totalErrors: d.totalErrors,
-        totalRxBytes: d.totalRxBytes,
-        totalRxDropped: d.totalRxDropped,
-        totalRxErrors: d.totalRxErrors,
-        avgRetryRate: d._retryN ? d._retrySum / d._retryN : null,
-        avgErrorRate: d._errN ? d._errSum / d._errN : null,
-        avgDropRate: d._dropN ? d._dropSum / d._dropN : null,
-        avgCpuPct: d._cpuN ? d._cpuSum / d._cpuN : null,
-        avgMemPct: d._memN ? d._memSum / d._memN : null,
-        lastUptimeSec: d.lastUptimeSec,
-      }))
+      .map((d) => {
+        const errDenom = d.totalAttempts || d.totalPackets;
+        return {
+          deviceLabel: d.deviceLabel,
+          samples: d.samples,
+          totalBytes: d.totalBytes,
+          totalPackets: d.totalPackets,
+          totalDropped: d.totalDropped,
+          totalErrors: d.totalErrors,
+          totalRxBytes: d.totalRxBytes,
+          totalRxDropped: d.totalRxDropped,
+          totalRxErrors: d.totalRxErrors,
+          avgRetryRate: ratio(d.totalRetries, errDenom),
+          avgErrorRate: ratio(d.totalErrors, errDenom),
+          avgDropRate: ratio(d.totalDropped, errDenom),
+          avgCpuPct: d._cpuN ? d._cpuSum / d._cpuN : null,
+          avgMemPct: d._memN ? d._memSum / d._memN : null,
+          lastUptimeSec: d.lastUptimeSec,
+        };
+      })
       .sort((a, b) => b.totalBytes + b.totalRxBytes - (a.totalBytes + a.totalRxBytes));
 
     const fromIso = new Date(q.from * 1000).toISOString().slice(0, 10);

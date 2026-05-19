@@ -80,13 +80,18 @@ function buildRollupSql(opts: {
       AVG(cpu_pct) AS cpu_pct,
       AVG(mem_pct) AS mem_pct,
       MAX(uptime_sec) AS uptime_sec,
+      -- Todas as taxas usam wifi_tx_attempts como denominador quando disponível
+      -- (fallback p/ tx_packets em firmwares antigos). Ver comentário no
+      -- metrics-write.ts para a justificativa semântica.
       CASE WHEN COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) > 0
            THEN 1.0 * SUM(d_tx_retries)
                 / COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) END AS retry_rate,
-      CASE WHEN SUM(d_tx_packets) > 0
-           THEN 1.0 * SUM(d_tx_errors) / SUM(d_tx_packets)  END AS error_rate,
-      CASE WHEN SUM(d_tx_packets) > 0
-           THEN 1.0 * SUM(d_tx_dropped) / SUM(d_tx_packets) END AS drop_rate
+      CASE WHEN COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) > 0
+           THEN 1.0 * SUM(d_tx_errors)
+                / COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) END AS error_rate,
+      CASE WHEN COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) > 0
+           THEN 1.0 * SUM(d_tx_dropped)
+                / COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) END AS drop_rate
     FROM ${opts.source}
     WHERE ts >= ? AND ts < ?
     ${opts.includeClientDimension ? '' : "AND client_mac = ''"}

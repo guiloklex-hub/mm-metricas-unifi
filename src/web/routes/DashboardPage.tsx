@@ -313,12 +313,10 @@ function summarizeDevices(
     dTxDropped: number | null;
     dTxErrors: number | null;
     dTxRetries: number | null;
+    dWifiTxAttempts: number | null;
     dRxBytes: number | null;
     dRxDropped: number | null;
     dRxErrors: number | null;
-    retryRate: number | null;
-    errorRate: number | null;
-    dropRate: number | null;
     cpuPct: number | null;
     memPct: number | null;
     uptimeSec: number | null;
@@ -328,12 +326,7 @@ function summarizeDevices(
   const acc = new Map<
     string,
     DeviceRowSummary & {
-      _retrySum: number;
-      _retryN: number;
-      _errSum: number;
-      _errN: number;
-      _dropSum: number;
-      _dropN: number;
+      _totalAttempts: number;
       _cpuSum: number;
       _cpuN: number;
       _memSum: number;
@@ -363,12 +356,7 @@ function summarizeDevices(
         avgCpuPct: null,
         avgMemPct: null,
         lastUptimeSec: null,
-        _retrySum: 0,
-        _retryN: 0,
-        _errSum: 0,
-        _errN: 0,
-        _dropSum: 0,
-        _dropN: 0,
+        _totalAttempts: 0,
         _cpuSum: 0,
         _cpuN: 0,
         _memSum: 0,
@@ -382,24 +370,13 @@ function summarizeDevices(
     cur.totalDropped += r.dTxDropped ?? 0;
     cur.totalErrors += r.dTxErrors ?? 0;
     cur.totalRetries += r.dTxRetries ?? 0;
+    cur._totalAttempts += r.dWifiTxAttempts ?? 0;
     cur.totalRxBytes += r.dRxBytes ?? 0;
     cur.totalRxDropped += r.dRxDropped ?? 0;
     cur.totalRxErrors += r.dRxErrors ?? 0;
     if (r.clientCount != null) {
       cur.maxClientCount =
         cur.maxClientCount == null ? r.clientCount : Math.max(cur.maxClientCount, r.clientCount);
-    }
-    if (r.retryRate != null) {
-      cur._retrySum += r.retryRate;
-      cur._retryN += 1;
-    }
-    if (r.errorRate != null) {
-      cur._errSum += r.errorRate;
-      cur._errN += 1;
-    }
-    if (r.dropRate != null) {
-      cur._dropSum += r.dropRate;
-      cur._dropN += 1;
     }
     if (r.cpuPct != null) {
       cur._cpuSum += r.cpuPct;
@@ -416,8 +393,13 @@ function summarizeDevices(
         cur.lastUptimeSec == null ? r.uptimeSec : Math.max(cur.lastUptimeSec, r.uptimeSec);
     }
   }
+  // Taxas via SUM(N)/SUM(D) — média ponderada pelo tráfego, não média
+  // aritmética dos rates por amostra (que falseava o número quando havia
+  // amostras com baixo tráfego e taxa alta). Denominador prefere
+  // wifi_tx_attempts (tx_errors pode ser > tx_packets em UniFi).
   const out: DeviceRowSummary[] = [];
   for (const v of acc.values()) {
+    const denom = v._totalAttempts || v.totalPackets;
     out.push({
       deviceId: v.deviceId,
       label: v.label,
@@ -431,9 +413,9 @@ function summarizeDevices(
       totalRxBytes: v.totalRxBytes,
       totalRxDropped: v.totalRxDropped,
       totalRxErrors: v.totalRxErrors,
-      avgRetryRate: v._retryN ? v._retrySum / v._retryN : null,
-      avgErrorRate: v._errN ? v._errSum / v._errN : null,
-      avgDropRate: v._dropN ? v._dropSum / v._dropN : null,
+      avgRetryRate: denom > 0 ? v.totalRetries / denom : null,
+      avgErrorRate: denom > 0 ? v.totalErrors / denom : null,
+      avgDropRate: denom > 0 ? v.totalDropped / denom : null,
       avgCpuPct: v._cpuN ? v._cpuSum / v._cpuN : null,
       avgMemPct: v._memN ? v._memSum / v._memN : null,
       lastUptimeSec: v.lastUptimeSec,
