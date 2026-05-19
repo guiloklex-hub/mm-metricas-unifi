@@ -33,6 +33,10 @@ export interface ParsedSample {
   txDropped: number | null;
   txErrors: number | null;
   txRetries: number | null;
+  rxBytes: number | null;
+  rxPackets: number | null;
+  rxDropped: number | null;
+  rxErrors: number | null;
 }
 
 export interface ParsedDeviceResult {
@@ -75,6 +79,10 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
         txDropped: null,
         txErrors: null,
         txRetries: intOrNull(r.tx_retries),
+        rxBytes: null,
+        rxPackets: null,
+        rxDropped: null,
+        rxErrors: null,
       });
     }
   }
@@ -102,6 +110,12 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
     txErrors: intOrNull(d.tx_errors) ?? intOrNull(stat?.tx_errors),
     txRetries:
       intOrNull(d.tx_retries) ?? intOrNull(stat?.tx_retries) ?? radioTotals.txRetries,
+    // Rx só vem do stat.ap em firmwares modernos — top-level do payload
+    // (d.rx_*) é o cumulativo de boot e está zerado em alguns firmwares.
+    rxBytes: intOrNull(stat?.rx_bytes) ?? intOrNull(d.rx_bytes),
+    rxPackets: intOrNull(stat?.rx_packets) ?? intOrNull(d.rx_packets),
+    rxDropped: intOrNull(stat?.rx_dropped),
+    rxErrors: intOrNull(stat?.rx_errors),
   };
 
   return { device, samples: [...radioSamples, deviceAggregate] };
@@ -141,6 +155,10 @@ export function computeSiteAggregate(samples: ParsedSample[]): ParsedSample {
     txDropped: null,
     txErrors: null,
     txRetries: null,
+    rxBytes: null,
+    rxPackets: null,
+    rxDropped: null,
+    rxErrors: null,
   };
   for (const s of samples) {
     if (s.deviceMac === null) continue; // já é agregado
@@ -152,6 +170,10 @@ export function computeSiteAggregate(samples: ParsedSample[]): ParsedSample {
     aggregate.txDropped = sumNullable(aggregate.txDropped, s.txDropped);
     aggregate.txErrors = sumNullable(aggregate.txErrors, s.txErrors);
     aggregate.txRetries = sumNullable(aggregate.txRetries, s.txRetries);
+    aggregate.rxBytes = sumNullable(aggregate.rxBytes, s.rxBytes);
+    aggregate.rxPackets = sumNullable(aggregate.rxPackets, s.rxPackets);
+    aggregate.rxDropped = sumNullable(aggregate.rxDropped, s.rxDropped);
+    aggregate.rxErrors = sumNullable(aggregate.rxErrors, s.rxErrors);
   }
   return aggregate;
 }
@@ -176,6 +198,10 @@ export function parseClientPayload(c: UnifiClientPayload): ParsedSample | null {
     txDropped: null,
     txErrors: null,
     txRetries: null,
+    rxBytes: intOrNull(c.rx_bytes),
+    rxPackets: intOrNull(c.rx_packets),
+    rxDropped: null,
+    rxErrors: null,
   };
 }
 
@@ -199,13 +225,16 @@ export function normalizeRadio(r: UnifiRadioStats): Radio | null {
   const name = typeof r.radio === 'string' ? r.radio.toLowerCase() : '';
   if (name === 'ng') return 'ng';
   if (name === 'na' || name === 'ax') return 'na';
-  if (name === '6e') return '6e';
+  // 6 GHz exposto sob nomes variados em diferentes firmwares.
+  if (name === '6e' || name === '6g' || name === 'ax6' || name === 'be') return '6e';
 
   const channel = typeof r.channel === 'number' ? r.channel : null;
   if (channel === null) return null;
+  // `wifi2*` indica a interface 6 GHz em firmwares antigos onde `radio` vinha
+  // como `wifi2`/`wifi2_1` em vez do nome canônico — desambigua via canal.
+  if (name.startsWith('wifi2') && channel >= 1 && channel <= 233) return '6e';
   if (channel >= 1 && channel <= 14) return 'ng';
   if (channel >= 30 && channel <= 200) return 'na';
-  if (channel >= 1 && channel <= 233 && name.startsWith('wifi2')) return '6e';
   return null;
 }
 
@@ -213,6 +242,11 @@ function intOrNull(value: unknown): number | null {
   if (typeof value !== 'number') return null;
   if (!Number.isFinite(value)) return null;
   if (value < 0) return null;
+  // Counter UniFi pode crescer indefinidamente; acima de MAX_SAFE_INTEGER
+  // perdemos precisão e gerariam deltas absurdos. Sentinela mais segura é
+  // tratar como `null` (counter reset detectado em rebobinada via lógica
+  // existente em metrics-write).
+  if (value > Number.MAX_SAFE_INTEGER) return null;
   return Math.trunc(value);
 }
 

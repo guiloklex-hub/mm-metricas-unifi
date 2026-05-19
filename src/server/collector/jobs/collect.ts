@@ -204,6 +204,10 @@ function toMetricInput(
     txDropped: sample.txDropped,
     txErrors: sample.txErrors,
     txRetries: sample.txRetries,
+    rxBytes: sample.rxBytes,
+    rxPackets: sample.rxPackets,
+    rxDropped: sample.rxDropped,
+    rxErrors: sample.rxErrors,
   };
 }
 

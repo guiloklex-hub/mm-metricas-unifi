@@ -15,6 +15,13 @@
       "when": 1779147675088,
       "tag": "0001_busy_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779211379679,
+      "tag": "0002_amusing_solo",
+      "breakpoints": true
     }
   ]
 }

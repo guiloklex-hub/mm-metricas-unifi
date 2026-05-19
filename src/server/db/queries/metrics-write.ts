@@ -29,9 +29,23 @@ export interface MetricSampleInput {
   txDropped: number | null;
   txErrors: number | null;
   txRetries: number | null;
+  rxBytes: number | null;
+  rxPackets: number | null;
+  rxDropped: number | null;
+  rxErrors: number | null;
 }
 
-const METRIC_NAMES = ['tx_bytes', 'tx_packets', 'tx_dropped', 'tx_errors', 'tx_retries'] as const;
+const METRIC_NAMES = [
+  'tx_bytes',
+  'tx_packets',
+  'tx_dropped',
+  'tx_errors',
+  'tx_retries',
+  'rx_bytes',
+  'rx_packets',
+  'rx_dropped',
+  'rx_errors',
+] as const;
 type MetricName = (typeof METRIC_NAMES)[number];
 
 function counterValue(sample: MetricSampleInput, metric: MetricName): number | null {
@@ -46,6 +60,14 @@ function counterValue(sample: MetricSampleInput, metric: MetricName): number | n
       return sample.txErrors;
     case 'tx_retries':
       return sample.txRetries;
+    case 'rx_bytes':
+      return sample.rxBytes;
+    case 'rx_packets':
+      return sample.rxPackets;
+    case 'rx_dropped':
+      return sample.rxDropped;
+    case 'rx_errors':
+      return sample.rxErrors;
   }
 }
 
@@ -67,11 +89,14 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
   const upsertMetric = sqlite.prepare(
     `INSERT INTO metrics_5m (
        ts, controller_id, site_id, device_id, radio, client_mac,
-       client_count, tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
+       client_count,
+       tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
+       rx_bytes, rx_packets, rx_dropped, rx_errors,
        d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
+       d_rx_bytes, d_rx_packets, d_rx_dropped, d_rx_errors,
        retry_rate, error_rate, drop_rate
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO UPDATE SET
        client_count = excluded.client_count,
        tx_bytes = excluded.tx_bytes,
@@ -79,11 +104,19 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
        tx_dropped = excluded.tx_dropped,
        tx_errors = excluded.tx_errors,
        tx_retries = excluded.tx_retries,
+       rx_bytes = excluded.rx_bytes,
+       rx_packets = excluded.rx_packets,
+       rx_dropped = excluded.rx_dropped,
+       rx_errors = excluded.rx_errors,
        d_tx_bytes = excluded.d_tx_bytes,
        d_tx_packets = excluded.d_tx_packets,
        d_tx_dropped = excluded.d_tx_dropped,
        d_tx_errors = excluded.d_tx_errors,
        d_tx_retries = excluded.d_tx_retries,
+       d_rx_bytes = excluded.d_rx_bytes,
+       d_rx_packets = excluded.d_rx_packets,
+       d_rx_dropped = excluded.d_rx_dropped,
+       d_rx_errors = excluded.d_rx_errors,
        retry_rate = excluded.retry_rate,
        error_rate = excluded.error_rate,
        drop_rate = excluded.drop_rate`,
@@ -126,6 +159,10 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
       const dTxDropped = computeDelta(s.txDropped, last.tx_dropped ?? null);
       const dTxErrors = computeDelta(s.txErrors, last.tx_errors ?? null);
       const dTxRetries = computeDelta(s.txRetries, last.tx_retries ?? null);
+      const dRxBytes = computeDelta(s.rxBytes, last.rx_bytes ?? null);
+      const dRxPackets = computeDelta(s.rxPackets, last.rx_packets ?? null);
+      const dRxDropped = computeDelta(s.rxDropped, last.rx_dropped ?? null);
+      const dRxErrors = computeDelta(s.rxErrors, last.rx_errors ?? null);
 
       if (detectReset(s, last)) resetSignals += 1;
 
@@ -146,21 +183,32 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
         s.txDropped,
         s.txErrors,
         s.txRetries,
+        s.rxBytes,
+        s.rxPackets,
+        s.rxDropped,
+        s.rxErrors,
         dTxBytes,
         dTxPackets,
         dTxDropped,
         dTxErrors,
         dTxRetries,
+        dRxBytes,
+        dRxPackets,
+        dRxDropped,
+        dRxErrors,
         retryRate,
         errorRate,
         dropRate,
       );
       inserted += 1;
 
-      // Atualiza counter_state para cada métrica disponível.
+      // Atualiza counter_state para cada métrica disponível. Usamos `v == null`
+      // para cobrir `undefined` que pode aparecer em helpers de teste antigos
+      // que constroem MetricSampleInput parcial — o tipo é `number | null` mas
+      // o switch retorna undefined quando o campo não está no objeto.
       for (const metric of METRIC_NAMES) {
         const v = counterValue(s, metric);
-        if (v === null) continue;
+        if (v == null) continue;
         upsertState.run(s.controllerId, s.siteId, devKey, radioKey, clientKey, metric, v, s.ts);
       }
     }
@@ -232,11 +280,20 @@ export function insertHistoricalSamples(
   const insert = sqlite.prepare(
     `INSERT INTO ${table} (
        ts, controller_id, site_id, device_id, radio, client_mac,
-       client_count, tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
+       client_count,
+       tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
+       rx_bytes, rx_packets, rx_dropped, rx_errors,
        d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
+       d_rx_bytes, d_rx_packets, d_rx_dropped, d_rx_errors,
        retry_rate, error_rate, drop_rate
      )
-     VALUES (?, ?, ?, ?, '', '', ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, NULL, NULL, NULL, NULL, ?)
+     VALUES (?, ?, ?, ?, '', '',
+             ?,
+             NULL, NULL, NULL, NULL, NULL,
+             NULL, NULL, NULL, NULL,
+             ?, ?, ?, NULL, NULL,
+             NULL, NULL, NULL, NULL,
+             NULL, NULL, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO NOTHING`,
   );
 

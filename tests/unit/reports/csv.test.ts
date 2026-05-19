@@ -54,6 +54,10 @@ describe('metricRowToCsv', () => {
       dTxDropped: 0,
       dTxErrors: 0,
       dTxRetries: 5,
+      dRxBytes: 800,
+      dRxPackets: 80,
+      dRxDropped: 0,
+      dRxErrors: 0,
       retryRate: 0.05,
       errorRate: 0,
       dropRate: 0,
@@ -62,7 +66,7 @@ describe('metricRowToCsv', () => {
     expect(out).toContain('2023-11-14');
     expect(out).toContain('ctrl-1');
     expect(out).toContain('site-1');
-    expect(out).toMatch(/,24,1000,100,0,0,5,0.05,0,0\n$/);
+    expect(out).toMatch(/,24,1000,100,0,0,5,800,80,0,0,0.05,0,0\n$/);
   });
 
   it('campos null viram vazio', () => {
@@ -79,10 +83,14 @@ describe('metricRowToCsv', () => {
       dTxDropped: null,
       dTxErrors: null,
       dTxRetries: null,
+      dRxBytes: null,
+      dRxPackets: null,
+      dRxDropped: null,
+      dRxErrors: null,
       retryRate: null,
       errorRate: null,
       dropRate: null,
     });
-    expect(out).toMatch(/^0,1970-01-01T00:00:00\.000Z,c,s,,,,,,,,,,,,\n$/);
+    expect(out).toMatch(/^0,1970-01-01T00:00:00\.000Z,c,s,,,,,,,,,,,,,,,,\n$/);
   });
 });

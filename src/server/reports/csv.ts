@@ -47,6 +47,10 @@ export const METRIC_CSV_HEADER = csvRow([
   'd_tx_dropped',
   'd_tx_errors',
   'd_tx_retries',
+  'd_rx_bytes',
+  'd_rx_packets',
+  'd_rx_dropped',
+  'd_rx_errors',
   'retry_rate',
   'error_rate',
   'drop_rate',
@@ -65,6 +69,10 @@ export interface CsvMetricRow {
   dTxDropped: number | null;
   dTxErrors: number | null;
   dTxRetries: number | null;
+  dRxBytes: number | null;
+  dRxPackets: number | null;
+  dRxDropped: number | null;
+  dRxErrors: number | null;
   retryRate: number | null;
   errorRate: number | null;
   dropRate: number | null;
@@ -87,6 +95,10 @@ export function metricRowToCsv(r: CsvMetricRow): string {
     r.dTxDropped,
     r.dTxErrors,
     r.dTxRetries,
+    r.dRxBytes,
+    r.dRxPackets,
+    r.dRxDropped,
+    r.dRxErrors,
     r.retryRate,
     r.errorRate,
     r.dropRate,
@@ -111,6 +123,10 @@ const COMMON_METRIC_COLS = [
   'd_tx_dropped',
   'd_tx_errors',
   'd_tx_retries',
+  'd_rx_bytes',
+  'd_rx_packets',
+  'd_rx_dropped',
+  'd_rx_errors',
   'retry_rate',
   'error_rate',
   'drop_rate',
@@ -188,6 +204,10 @@ function commonMetricValues(r: MetricRow): Array<number | null> {
     r.dTxDropped,
     r.dTxErrors,
     r.dTxRetries,
+    r.dRxBytes,
+    r.dRxPackets,
+    r.dRxDropped,
+    r.dRxErrors,
     r.retryRate,
     r.errorRate,
     r.dropRate,

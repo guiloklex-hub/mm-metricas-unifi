@@ -21,6 +21,10 @@ export interface MetricRow {
   dTxDropped: number | null;
   dTxErrors: number | null;
   dTxRetries: number | null;
+  dRxBytes: number | null;
+  dRxPackets: number | null;
+  dRxDropped: number | null;
+  dRxErrors: number | null;
   retryRate: number | null;
   errorRate: number | null;
   dropRate: number | null;
@@ -98,6 +102,8 @@ export function queryMetrics(
            d_tx_bytes AS dTxBytes, d_tx_packets AS dTxPackets,
            d_tx_dropped AS dTxDropped, d_tx_errors AS dTxErrors,
            d_tx_retries AS dTxRetries,
+           d_rx_bytes AS dRxBytes, d_rx_packets AS dRxPackets,
+           d_rx_dropped AS dRxDropped, d_rx_errors AS dRxErrors,
            retry_rate AS retryRate, error_rate AS errorRate, drop_rate AS dropRate
     FROM ${table}
     WHERE ${where.join(' AND ')}
@@ -118,6 +124,10 @@ export function queryMetrics(
     dTxDropped: number | null;
     dTxErrors: number | null;
     dTxRetries: number | null;
+    dRxBytes: number | null;
+    dRxPackets: number | null;
+    dRxDropped: number | null;
+    dRxErrors: number | null;
     retryRate: number | null;
     errorRate: number | null;
     dropRate: number | null;
@@ -136,6 +146,10 @@ export function queryMetrics(
     dTxDropped: r.dTxDropped,
     dTxErrors: r.dTxErrors,
     dTxRetries: r.dTxRetries,
+    dRxBytes: r.dRxBytes,
+    dRxPackets: r.dRxPackets,
+    dRxDropped: r.dRxDropped,
+    dRxErrors: r.dRxErrors,
     retryRate: r.retryRate,
     errorRate: r.errorRate,
     dropRate: r.dropRate,

@@ -14,6 +14,10 @@ export interface MetricRow {
   dTxDropped: number | null;
   dTxErrors: number | null;
   dTxRetries: number | null;
+  dRxBytes: number | null;
+  dRxPackets: number | null;
+  dRxDropped: number | null;
+  dRxErrors: number | null;
   retryRate: number | null;
   errorRate: number | null;
   dropRate: number | null;

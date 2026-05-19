@@ -77,6 +77,7 @@ export const devices = sqliteTable(
   (t) => ({
     ctrlMacUnique: uniqueIndex('devices_controller_mac_unique').on(t.controllerId, t.mac),
     siteIdx: index('devices_site_idx').on(t.siteId),
+    aliasIdx: index('devices_alias_idx').on(t.displayAlias),
   }),
 );
 
@@ -100,11 +101,19 @@ const metricsColumns = {
   txDropped: integer('tx_dropped'),
   txErrors: integer('tx_errors'),
   txRetries: integer('tx_retries'),
+  rxBytes: integer('rx_bytes'),
+  rxPackets: integer('rx_packets'),
+  rxDropped: integer('rx_dropped'),
+  rxErrors: integer('rx_errors'),
   dTxBytes: integer('d_tx_bytes'),
   dTxPackets: integer('d_tx_packets'),
   dTxDropped: integer('d_tx_dropped'),
   dTxErrors: integer('d_tx_errors'),
   dTxRetries: integer('d_tx_retries'),
+  dRxBytes: integer('d_rx_bytes'),
+  dRxPackets: integer('d_rx_packets'),
+  dRxDropped: integer('d_rx_dropped'),
+  dRxErrors: integer('d_rx_errors'),
   retryRate: real('retry_rate'),
   errorRate: real('error_rate'),
   dropRate: real('drop_rate'),
@@ -122,6 +131,7 @@ export const metrics5m = sqliteTable('metrics_5m', metricsColumns, (t) => ({
   deviceTs: index('metrics_5m_device_ts').on(t.deviceId, t.ts),
   siteTs: index('metrics_5m_site_ts').on(t.siteId, t.ts),
   clientTs: index('metrics_5m_client_ts').on(t.clientMac, t.ts),
+  controllerTs: index('metrics_5m_controller_ts').on(t.controllerId, t.ts),
 }));
 
 export const metrics1h = sqliteTable('metrics_1h', metricsColumns, (t) => ({
@@ -135,6 +145,7 @@ export const metrics1h = sqliteTable('metrics_1h', metricsColumns, (t) => ({
   ),
   deviceTs: index('metrics_1h_device_ts').on(t.deviceId, t.ts),
   siteTs: index('metrics_1h_site_ts').on(t.siteId, t.ts),
+  controllerTs: index('metrics_1h_controller_ts').on(t.controllerId, t.ts),
 }));
 
 export const metrics1d = sqliteTable('metrics_1d', metricsColumns, (t) => ({
@@ -148,6 +159,7 @@ export const metrics1d = sqliteTable('metrics_1d', metricsColumns, (t) => ({
   ),
   deviceTs: index('metrics_1d_device_ts').on(t.deviceId, t.ts),
   siteTs: index('metrics_1d_site_ts').on(t.siteId, t.ts),
+  controllerTs: index('metrics_1d_controller_ts').on(t.controllerId, t.ts),
 }));
 
 /* ---------- Operacional ---------- */

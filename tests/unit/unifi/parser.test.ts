@@ -221,6 +221,48 @@ describe('parseDevicePayload — fixture realista', () => {
     const agg = r.samples.find((s) => s.radio === null)!;
     expect(agg.txErrors).toBe(999);
   });
+
+  it('captura rx_bytes/rx_packets/rx_errors/rx_dropped de stat.ap', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      tx_bytes: 163141999,
+      stat: {
+        ap: {
+          rx_bytes: 64761161,
+          rx_packets: 116556,
+          rx_errors: 1312,
+          rx_dropped: 1312,
+        },
+      },
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.rxBytes).toBe(64761161);
+    expect(agg.rxPackets).toBe(116556);
+    expect(agg.rxErrors).toBe(1312);
+    expect(agg.rxDropped).toBe(1312);
+  });
+
+  it('intOrNull rejeita valores acima de MAX_SAFE_INTEGER', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      tx_bytes: Number.MAX_SAFE_INTEGER + 1, // perda de precisão
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.txBytes).toBeNull();
+  });
+});
+
+describe('normalizeRadio — aliases novos', () => {
+  it('reconhece nomes 6e alternativos (6g, ax6, be)', () => {
+    expect(normalizeRadio({ radio: '6e' })).toBe('6e');
+    expect(normalizeRadio({ radio: '6g' })).toBe('6e');
+    expect(normalizeRadio({ radio: 'ax6' })).toBe('6e');
+    expect(normalizeRadio({ radio: 'be' })).toBe('6e');
+  });
 });
 
 describe('computeSiteAggregate', () => {
