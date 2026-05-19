@@ -67,6 +67,8 @@ export const devices = sqliteTable(
       .references(() => sites.id, { onDelete: 'cascade' }),
     mac: text('mac').notNull(),
     name: text('name'),
+    /** Apelido custom definido pelo operador (sobrescreve `name` na UI). */
+    displayAlias: text('display_alias'),
     model: text('model'),
     type: text('type').notNull(),
     firstSeen: integer('first_seen').notNull(),

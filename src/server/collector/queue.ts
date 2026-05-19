@@ -11,7 +11,9 @@ import { ulid } from 'ulid';
  *   - markDone(id) / markFailed(id, err, retryDelayMs?) — encerra com
  *     retry exponencial até `max_attempts`.
  *
- * O claim usa `UPDATE ... RETURNING` que SQLite serializa, então não há TOCTOU.
+ * O claim usa `UPDATE ... RETURNING` que SQLite serializa, e o enqueue com
+ * `idempotencyKey` usa `INSERT ... WHERE NOT EXISTS (...)` num único statement,
+ * então também não tem TOCTOU.
  */
 
 export type JobKind =
@@ -85,12 +87,30 @@ export class JobQueue {
     const at = runAt ?? now;
     const payloadJson = payload === undefined || payload === null ? null : JSON.stringify(payload);
 
+    // Idempotência: usa um INSERT condicional atômico em vez de SELECT + INSERT
+    // separados. SQLite avalia a sub-query e o INSERT no mesmo statement,
+    // fechando a janela de TOCTOU em que dois callers podem inserir o mesmo
+    // job entre o check e o write.
     if (opts.idempotencyKey !== undefined) {
+      const prefix = `${kind}:${opts.idempotencyKey}:`;
+      const id = `${prefix}${ulid()}`;
+      const result = this.db.$client
+        .prepare(
+          `INSERT INTO jobs (id, kind, payload_json, run_at, status, attempts, max_attempts, locked_until, last_error, created_at, updated_at)
+           SELECT ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?
+           WHERE NOT EXISTS (
+             SELECT 1 FROM jobs
+             WHERE kind = ? AND id LIKE ? AND status IN ('pending', 'running')
+           )`,
+        )
+        .run(id, kind, payloadJson, at, opts.maxAttempts ?? 5, now, now, kind, `${prefix}%`);
+      if (result.changes > 0) return id;
+      // Outro caller venceu a corrida — devolve o id do job vivo.
       const existing = this.findActiveByKey(kind, opts.idempotencyKey);
-      if (existing) return existing.id;
+      return existing ? existing.id : null;
     }
 
-    const id = opts.idempotencyKey ? `${kind}:${opts.idempotencyKey}:${ulid()}` : ulid();
+    const id = ulid();
     this.db.$client
       .prepare(
         `INSERT INTO jobs (id, kind, payload_json, run_at, status, attempts, max_attempts, locked_until, last_error, created_at, updated_at)

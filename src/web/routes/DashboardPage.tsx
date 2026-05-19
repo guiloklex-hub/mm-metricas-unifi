@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useControllers } from '../api/queries/controllers.ts';
+import { useDevices } from '../api/queries/devices.ts';
 import { useMetricsRecent, useMetricsStatus } from '../api/queries/metrics.ts';
 import { useTopTalkers } from '../api/queries/top-talkers.ts';
 import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeatmap.tsx';
@@ -26,9 +27,25 @@ export function DashboardPage() {
     controllerId,
     groupBy: 'device',
   });
+  const devices = useDevices(controllerId ? { controllerId } : {});
 
-  const series = useMemo(() => groupSeries(recent.data?.rows ?? []), [recent.data]);
-  const tableRows = useMemo(() => summarizeDevices(recent.data?.rows ?? []), [recent.data]);
+  const aliasMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const d of devices.data ?? []) {
+      const label = d.displayAlias ?? d.name ?? null;
+      if (label) map.set(d.id, label);
+    }
+    return map;
+  }, [devices.data]);
+
+  const series = useMemo(
+    () => groupSeries(recent.data?.rows ?? [], aliasMap),
+    [recent.data, aliasMap],
+  );
+  const tableRows = useMemo(
+    () => summarizeDevices(recent.data?.rows ?? [], aliasMap),
+    [recent.data, aliasMap],
+  );
   const heatmapCells = useMemo<HeatmapCell[]>(
     () =>
       (recent.data?.rows ?? [])
@@ -160,22 +177,39 @@ export function DashboardPage() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-3 py-2">Device</th>
+                  <th className="px-3 py-2">Antena</th>
                   <th className="px-3 py-2">Amostras</th>
+                  <th className="px-3 py-2" title="Maior número de clientes conectados na janela">
+                    Clientes (máx)
+                  </th>
                   <th className="px-3 py-2">Bytes Tx</th>
                   <th className="px-3 py-2">Pkts Tx</th>
-                  <th className="px-3 py-2">Retx (médio)</th>
-                  <th className="px-3 py-2">Erros (médio)</th>
-                  <th className="px-3 py-2">Drop (médio)</th>
+                  <th className="px-3 py-2">Pkts Dropped</th>
+                  <th className="px-3 py-2">Erros</th>
+                  <th className="px-3 py-2">Retx</th>
+                  <th className="px-3 py-2">Retx %</th>
+                  <th className="px-3 py-2">Erro %</th>
+                  <th className="px-3 py-2">Drop %</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {tableRows.map((r) => (
                   <tr key={r.deviceId}>
-                    <td className="px-3 py-2 font-mono text-xs">{r.deviceId}</td>
+                    <td className="px-3 py-2 text-xs">
+                      {r.label}
+                      {r.label !== r.deviceId && (
+                        <span className="ml-2 font-mono text-[10px] text-slate-400">
+                          {r.deviceId.slice(0, 8)}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2">{r.samples}</td>
+                    <td className="px-3 py-2">{formatNumber(r.maxClientCount)}</td>
                     <td className="px-3 py-2">{formatBytes(r.totalBytes)}</td>
                     <td className="px-3 py-2">{formatNumber(r.totalPackets)}</td>
+                    <td className="px-3 py-2">{formatNumber(r.totalDropped)}</td>
+                    <td className="px-3 py-2">{formatNumber(r.totalErrors)}</td>
+                    <td className="px-3 py-2">{formatNumber(r.totalRetries)}</td>
                     <td className="px-3 py-2">{formatRate(r.avgRetryRate)}</td>
                     <td className="px-3 py-2">{formatRate(r.avgErrorRate)}</td>
                     <td className="px-3 py-2">{formatRate(r.avgDropRate)}</td>
@@ -201,6 +235,7 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 
 function groupSeries(
   rows: Array<{ ts: number; deviceId: string | null; dTxBytes: number | null }>,
+  aliasMap: Map<string, string>,
 ): TimeSeriesSeries[] {
   const byDevice = new Map<string, Array<{ ts: number; value: number | null }>>();
   for (const r of rows) {
@@ -209,16 +244,21 @@ function groupSeries(
     byDevice.get(r.deviceId)!.push({ ts: r.ts, value: r.dTxBytes });
   }
   return [...byDevice.entries()].map(([deviceId, data]) => ({
-    name: deviceId.slice(0, 10),
+    name: aliasMap.get(deviceId) ?? deviceId.slice(0, 10),
     data,
   }));
 }
 
 interface DeviceRowSummary {
   deviceId: string;
+  label: string;
   samples: number;
+  maxClientCount: number | null;
   totalBytes: number;
   totalPackets: number;
+  totalDropped: number;
+  totalErrors: number;
+  totalRetries: number;
   avgRetryRate: number | null;
   avgErrorRate: number | null;
   avgDropRate: number | null;
@@ -227,12 +267,17 @@ interface DeviceRowSummary {
 function summarizeDevices(
   rows: Array<{
     deviceId: string | null;
+    clientCount: number | null;
     dTxBytes: number | null;
     dTxPackets: number | null;
+    dTxDropped: number | null;
+    dTxErrors: number | null;
+    dTxRetries: number | null;
     retryRate: number | null;
     errorRate: number | null;
     dropRate: number | null;
   }>,
+  aliasMap: Map<string, string>,
 ): DeviceRowSummary[] {
   const acc = new Map<
     string,
@@ -251,9 +296,14 @@ function summarizeDevices(
     if (!cur) {
       cur = {
         deviceId: r.deviceId,
+        label: aliasMap.get(r.deviceId) ?? r.deviceId,
         samples: 0,
+        maxClientCount: null,
         totalBytes: 0,
         totalPackets: 0,
+        totalDropped: 0,
+        totalErrors: 0,
+        totalRetries: 0,
         avgRetryRate: null,
         avgErrorRate: null,
         avgDropRate: null,
@@ -269,6 +319,13 @@ function summarizeDevices(
     cur.samples += 1;
     cur.totalBytes += r.dTxBytes ?? 0;
     cur.totalPackets += r.dTxPackets ?? 0;
+    cur.totalDropped += r.dTxDropped ?? 0;
+    cur.totalErrors += r.dTxErrors ?? 0;
+    cur.totalRetries += r.dTxRetries ?? 0;
+    if (r.clientCount != null) {
+      cur.maxClientCount =
+        cur.maxClientCount == null ? r.clientCount : Math.max(cur.maxClientCount, r.clientCount);
+    }
     if (r.retryRate != null) {
       cur._retrySum += r.retryRate;
       cur._retryN += 1;
@@ -286,9 +343,14 @@ function summarizeDevices(
   for (const v of acc.values()) {
     out.push({
       deviceId: v.deviceId,
+      label: v.label,
       samples: v.samples,
+      maxClientCount: v.maxClientCount,
       totalBytes: v.totalBytes,
       totalPackets: v.totalPackets,
+      totalDropped: v.totalDropped,
+      totalErrors: v.totalErrors,
+      totalRetries: v.totalRetries,
       avgRetryRate: v._retryN ? v._retrySum / v._retryN : null,
       avgErrorRate: v._errN ? v._errSum / v._errN : null,
       avgDropRate: v._dropN ? v._dropSum / v._dropN : null,

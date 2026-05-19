@@ -29,6 +29,14 @@ export class UnifiClientError extends Error {
   }
 }
 
+/**
+ * Timeouts globais para qualquer request ao controller. Evita coletas travadas
+ * em sockets meio-abertos (cenário comum quando o controller passa por um
+ * tunnel/proxy ou está parcialmente saudável).
+ */
+const HTTP_HEADERS_TIMEOUT_MS = 20_000;
+const HTTP_BODY_TIMEOUT_MS = 30_000;
+
 interface Session {
   cookie: string;
   csrf: string | null;
@@ -102,6 +110,8 @@ export class UnifiClient {
       method: 'POST',
       dispatcher: this.dispatcher,
       headers: { 'content-type': 'application/json' },
+      headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
+      bodyTimeout: HTTP_BODY_TIMEOUT_MS,
       body: JSON.stringify({
         username: this.config.auth.username,
         password: this.config.auth.password,
@@ -190,8 +200,14 @@ export class UnifiClient {
 
   private async authedGet(url: string): Promise<{ data?: unknown[] }> {
     const headers = this.buildAuthHeaders();
-    let res = await request(url, { method: 'GET', dispatcher: this.dispatcher, headers });
-    if (res.statusCode === 401 && this.config.auth.mode === 'local') {
+    let res = await request(url, {
+      method: 'GET',
+      dispatcher: this.dispatcher,
+      headers,
+      headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
+      bodyTimeout: HTTP_BODY_TIMEOUT_MS,
+    });
+    if (isAuthExpired(res.statusCode) && this.config.auth.mode === 'local') {
       await res.body.text();
       this.session = null;
       await this.loginMutex.run(() => this.login());
@@ -199,6 +215,8 @@ export class UnifiClient {
         method: 'GET',
         dispatcher: this.dispatcher,
         headers: this.buildAuthHeaders(),
+        headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
+        bodyTimeout: HTTP_BODY_TIMEOUT_MS,
       });
     }
     if (res.statusCode >= 400) {
@@ -213,8 +231,15 @@ export class UnifiClient {
   private async authedPost(url: string, payload: unknown): Promise<{ data?: unknown[] }> {
     const headers = { ...this.buildAuthHeaders(), 'content-type': 'application/json' };
     const body = JSON.stringify(payload);
-    let res = await request(url, { method: 'POST', dispatcher: this.dispatcher, headers, body });
-    if (res.statusCode === 401 && this.config.auth.mode === 'local') {
+    let res = await request(url, {
+      method: 'POST',
+      dispatcher: this.dispatcher,
+      headers,
+      headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
+      bodyTimeout: HTTP_BODY_TIMEOUT_MS,
+      body,
+    });
+    if (isAuthExpired(res.statusCode) && this.config.auth.mode === 'local') {
       await res.body.text();
       this.session = null;
       await this.loginMutex.run(() => this.login());
@@ -222,6 +247,8 @@ export class UnifiClient {
         method: 'POST',
         dispatcher: this.dispatcher,
         headers: { ...this.buildAuthHeaders(), 'content-type': 'application/json' },
+        headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
+        bodyTimeout: HTTP_BODY_TIMEOUT_MS,
         body,
       });
     }
@@ -267,6 +294,15 @@ export function buildAuth(input: {
 }
 
 /* ----- helpers ----- */
+
+/**
+ * Tanto 401 quanto 403 podem indicar cookie/sessão expirada no UniFi OS.
+ * Versões mais novas devolvem 403 com o body `{ meta: { rc: 'error', msg: 'api.err.LoginRequired' } }`
+ * em chamadas autenticadas quando o cookie morre durante a request.
+ */
+function isAuthExpired(statusCode: number): boolean {
+  return statusCode === 401 || statusCode === 403;
+}
 
 class Mutex {
   private chain: Promise<unknown> = Promise.resolve();

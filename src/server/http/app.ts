@@ -11,6 +11,7 @@ import { registerErrorHandler } from './plugins/error-handler.ts';
 import { registerAuditRoutes } from './routes/audit.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerControllerRoutes } from './routes/controllers.ts';
+import { registerDeviceRoutes } from './routes/devices.ts';
 import { registerHealthz } from './routes/healthz.ts';
 import { registerMetricsRoutes } from './routes/metrics.ts';
 import { registerReportRoutes } from './routes/reports.ts';
@@ -52,6 +53,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
     masterKey: opts.masterKey,
   });
   await registerSiteRoutes(app, opts.db);
+  await registerDeviceRoutes(app, opts.db);
   await registerMetricsRoutes(app, opts.db);
   await registerReportRoutes(app, opts.db);
   await registerAuditRoutes(app, opts.db);

@@ -50,6 +50,29 @@ describe('JobQueue', () => {
     expect(a).toBe(b);
   });
 
+  it('idempotencyKey: 20 chamadas seguidas produzem 1 job único (anti-TOCTOU)', () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 20; i += 1) {
+      const id = queue.enqueue('collect', { i }, undefined, { idempotencyKey: 'same-key' });
+      if (id) ids.add(id);
+    }
+    expect(ids.size).toBe(1);
+
+    const rows = db.$client
+      .prepare("SELECT id FROM jobs WHERE kind = 'collect' AND status IN ('pending','running')")
+      .all() as Array<{ id: string }>;
+    expect(rows).toHaveLength(1);
+  });
+
+  it('idempotencyKey: depois que o job vira done, novo enqueue cria outro', () => {
+    const a = queue.enqueue('collect', null, undefined, { idempotencyKey: 'k1' });
+    const job = queue.claimNext()!;
+    queue.markDone(job.id);
+    const b = queue.enqueue('collect', null, undefined, { idempotencyKey: 'k1' });
+    expect(b).not.toBeNull();
+    expect(b).not.toBe(a);
+  });
+
   it('markDone marca status=done', () => {
     queue.enqueue('collect', null);
     const job = queue.claimNext()!;

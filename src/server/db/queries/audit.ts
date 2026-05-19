@@ -12,6 +12,8 @@ export type AuditAction =
   | 'controller.deleted'
   | 'controller.updated'
   | 'controller.backfill.requested'
+  | 'device.alias.updated'
+  | 'device.aliases.imported'
   | 'report.csv'
   | 'report.pdf';
 
