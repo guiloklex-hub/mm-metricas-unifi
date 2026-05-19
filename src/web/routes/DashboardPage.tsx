@@ -6,6 +6,7 @@ import { useTopTalkers } from '../api/queries/top-talkers.ts';
 import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeatmap.tsx';
 import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/TimeSeriesChart.tsx';
 import { Card } from '../components/ui/Card.tsx';
+import { QueryState } from '../components/ui/QueryState.tsx';
 import { deviceLabelWithMac } from '../lib/device-label.ts';
 import { formatBytes, formatNumber, formatRate, formatRelative } from '../lib/format.ts';
 
@@ -111,39 +112,41 @@ export function DashboardPage() {
           </div>
         }
       >
-        {recent.isLoading ? (
-          <p className="text-sm text-slate-500">Carregando…</p>
-        ) : series.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Sem amostras nesta janela. Cadastre um controller e aguarde a primeira coleta.
-          </p>
-        ) : (
+        <QueryState
+          isLoading={recent.isLoading}
+          isError={recent.isError}
+          error={recent.error}
+          isEmpty={series.length === 0}
+          emptyText="Sem amostras nesta janela. Cadastre um controller e aguarde a primeira coleta."
+        >
           <TimeSeriesChart
             series={series}
             yLabel="Bytes / janela"
             formatY={(v) => formatBytes(v)}
           />
-        )}
+        </QueryState>
       </Card>
 
       <Card title="Taxa de retransmissão — hora × dia">
-        {heatmapCells.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Sem amostras suficientes na janela selecionada para o heatmap.
-          </p>
-        ) : (
+        <QueryState
+          isLoading={recent.isLoading}
+          isError={recent.isError}
+          error={recent.error}
+          isEmpty={heatmapCells.length === 0}
+          emptyText="Sem amostras suficientes na janela selecionada para o heatmap."
+        >
           <HourlyHeatmap cells={heatmapCells} formatValue={(v) => formatRate(v)} />
-        )}
+        </QueryState>
       </Card>
 
       <Card title="Top talkers (clientes que mais consumiram)">
-        {topTalkers.isLoading ? (
-          <p className="text-sm text-slate-500">Carregando…</p>
-        ) : !topTalkers.data || topTalkers.data.rows.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Sem dados de cliente nesta janela. Coletor precisa estar rodando há pelo menos um ciclo.
-          </p>
-        ) : (
+        <QueryState
+          isLoading={topTalkers.isLoading}
+          isError={topTalkers.isError}
+          error={topTalkers.error}
+          isEmpty={!topTalkers.data || topTalkers.data.rows.length === 0}
+          emptyText="Sem dados de cliente nesta janela. Coletor precisa estar rodando há pelo menos um ciclo."
+        >
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -155,7 +158,7 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {topTalkers.data.rows.map((t) => (
+                {topTalkers.data?.rows.map((t) => (
                   <tr key={t.clientMac}>
                     <td className="px-3 py-2 font-mono text-xs">{t.clientMac}</td>
                     <td className="px-3 py-2">{formatBytes(t.totalBytes)}</td>
@@ -166,13 +169,17 @@ export function DashboardPage() {
               </tbody>
             </table>
           </div>
-        )}
+        </QueryState>
       </Card>
 
       <Card title="Resumo por AP">
-        {tableRows.length === 0 ? (
-          <p className="text-sm text-slate-500">Nada para mostrar ainda.</p>
-        ) : (
+        <QueryState
+          isLoading={recent.isLoading}
+          isError={recent.isError}
+          error={recent.error}
+          isEmpty={tableRows.length === 0}
+          emptyText="Nada para mostrar ainda."
+        >
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
@@ -215,7 +222,7 @@ export function DashboardPage() {
               </tbody>
             </table>
           </div>
-        )}
+        </QueryState>
       </Card>
     </div>
   );

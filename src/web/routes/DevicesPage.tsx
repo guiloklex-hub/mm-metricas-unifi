@@ -261,6 +261,19 @@ function ImportCsvCard({ controllerId, onDone }: ImportCsvCardProps) {
           >
             Importar
           </Button>
+          {(csv.length > 0 || error || result) && (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setCsv('');
+                setFilename(null);
+                setError(null);
+                setResult(null);
+              }}
+            >
+              Limpar
+            </Button>
+          )}
           {controllerId && (
             <span className="text-xs text-slate-500">
               Aplicando apenas ao controller selecionado.

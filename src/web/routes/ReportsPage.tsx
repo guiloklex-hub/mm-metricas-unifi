@@ -76,14 +76,18 @@ export function ReportsPage() {
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const cd = res.headers.get('content-disposition') ?? '';
-    const filenameMatch = /filename="([^"]+)"/.exec(cd);
-    const filename = filenameMatch?.[1] ?? `download-${Date.now()}`;
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const cd = res.headers.get('content-disposition') ?? '';
+      const filenameMatch = /filename="([^"]+)"/.exec(cd);
+      const filename = filenameMatch?.[1] ?? `download-${Date.now()}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+    } finally {
+      // Garante revoke mesmo se algo der errado na manipulação do <a>.
+      URL.revokeObjectURL(url);
+    }
   }
 
   async function exportData(): Promise<void> {

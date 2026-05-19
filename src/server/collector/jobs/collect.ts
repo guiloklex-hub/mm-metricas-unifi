@@ -116,6 +116,19 @@ export async function runCollectJob(
     );
   } else {
     markControllerSeen(db, payload.controllerId);
+    // Falha parcial: deixa registro visível no log para diagnóstico, mas não
+    // marca o controller como down. O markControllerSeen mantém lastSeenAt
+    // limpo já que pelo menos 1 site respondeu.
+    if (result.errors.length > 0) {
+      log.warn(
+        {
+          totalSites: enabledSites.length,
+          failedSites: result.errors.map((e) => e.site),
+          firstError: result.errors[0]?.message,
+        },
+        'falha parcial: alguns sites do controller não puderam ser coletados',
+      );
+    }
   }
 
   return result;

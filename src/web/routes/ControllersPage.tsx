@@ -100,13 +100,15 @@ function ControllerRow({
           {c.baseUrl} · {c.variant ?? 'auto-detect'} ·{' '}
           {editingPoll ? (
             <>
-              poll{' '}
+              <label htmlFor={`poll-${c.id}`}>poll </label>
               <input
+                id={`poll-${c.id}`}
                 type="number"
                 min={60}
                 max={3600}
                 value={pollDraft}
                 onChange={(e) => setPollDraft(Number(e.target.value))}
+                aria-label="Intervalo de polling em segundos"
                 className="w-20 rounded border border-slate-300 px-1 py-0 text-xs dark:border-slate-700 dark:bg-slate-950"
               />
               s{' '}

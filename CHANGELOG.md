@@ -4,6 +4,46 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — captura completa de métricas RX
+- Novas colunas `rx_bytes`, `rx_packets`, `rx_dropped`, `rx_errors` + deltas
+  `d_rx_*` em `metrics_5m`/`1h`/`1d` (migration `0002_amusing_solo.sql`).
+- Parser passou a ler `stat.ap.rx_*` do payload UniFi — esses valores
+  aparecem na console mas o sistema ignorava antes.
+- Dashboard "Resumo por AP" mostra colunas "Bytes Rx" e "Erros (Rx)".
+- CSV/ZIP de exportação inclui `d_rx_*` em todos os níveis.
+- Counter overflow guard: valores acima de `Number.MAX_SAFE_INTEGER` viram
+  null em vez de gerarem deltas absurdos.
+- Detecção 6 GHz reconhece aliases novos: `6g`, `ax6`, `be`.
+- Index `metrics_*_controller_ts` em 3 tabelas — queries de export por
+  controller deixam de fazer scan completo.
+- Index `devices_alias_idx` em `display_alias`.
+
+### Security
+- Remove `echarts-for-react` (trazia `size-sensor` CRITICAL malware como
+  dep transitiva). Charts já usavam `echarts/core` direto.
+- `@fastify/helmet`: HSTS, X-Frame-Options, X-Content-Type-Options=nosniff,
+  Referrer-Policy. CSP fica off por agora (Vite gera inline scripts).
+- SSRF guard em `POST /api/v1/controllers/test`: recusa hostname interno
+  (localhost, link-local, RFC1918) por padrão. Opt-in via env
+  `ALLOW_LOCAL_CONTROLLER=1`. Adiciona timeouts no undici (5/8/10s) e
+  esconde `err.message` cru.
+- Login rate-limit: 5/15min → 3/15min.
+- Logger Pino redaction estendida: `jwt`, `masterKey`, `jwtSecret`,
+  `passwordEnc`, `apiKeyEnc`, `twoFactorSecret` + variantes snake_case.
+
+### Changed — UX e robustez
+- Novo componente `<QueryState>` para estados consistentes de loading/
+  error/empty. Aplicado em todas as Cards do Dashboard. Antes, queries
+  com falha mostravam "Carregando…" pra sempre.
+- `ReportsPage.downloadFile` usa `try/finally` para garantir que
+  `URL.createObjectURL` seja revogado mesmo em caminho de erro (era
+  memory leak ao falhar download repetidas vezes).
+- DevicesPage import CSV ganhou botão "Limpar" que reseta arquivo,
+  preview, resultado e erros — fim de usuário preso em estado confuso.
+- ControllersPage: input de poll seconds com `htmlFor` + `aria-label`.
+- Coletor reporta `failedSites` em falha parcial via `log.warn` em vez de
+  esconder o problema dentro do counter `errors[]`.
+
 ### Added
 - **Exportação ZIP por nível** (`GET /api/v1/export/metrics.zip`). Devolve um
   ZIP com até 4 CSVs separados — `por-site.csv`, `por-antena.csv`,
