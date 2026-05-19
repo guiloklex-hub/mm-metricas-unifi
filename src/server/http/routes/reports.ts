@@ -13,9 +13,18 @@ import {
 import { buildLabelMaps } from '@server/reports/labels.ts';
 import { renderMetricsReport } from '@server/reports/pdf.ts';
 import { chooseGranularity } from '@server/utils/time.ts';
-import archiver from 'archiver';
+// archiver v8 removeu a função fábrica `archiver('zip', opts)`; agora exporta
+// só as classes (`ZipArchive`, `TarArchive`, ...). @types/archiver é da v7 e
+// não conhece `ZipArchive`, então fazemos um import dinâmico tipado à mão.
+import type { Archiver, ArchiverOptions } from 'archiver';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
+
+interface ArchiverV8Module {
+  ZipArchive: new (options?: ArchiverOptions) => Archiver;
+}
+const archiverMod = (await import('archiver')) as unknown as ArchiverV8Module;
+const ZipArchive = archiverMod.ZipArchive;
 
 const LEVELS: readonly CsvLevel[] = ['site', 'device', 'radio', 'client'];
 const LEVEL_TO_GROUP_BY: Record<CsvLevel, 'site' | 'device' | 'radio' | 'client'> = {
@@ -296,7 +305,7 @@ async function streamZip(
   reply.raw.setHeader('content-disposition', `attachment; filename="${filename}"`);
   reply.raw.setHeader('cache-control', 'no-store');
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   archive.pipe(reply.raw);
 
   for (const level of levels) {
