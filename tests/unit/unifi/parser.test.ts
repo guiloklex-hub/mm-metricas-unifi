@@ -122,6 +122,61 @@ describe('parseDevicePayload — fixture realista', () => {
   it('snapshot — payload completo do AP de loja', () => {
     expect(parseDevicePayload(ap1)).toMatchSnapshot();
   });
+
+  it('agrega tx_packets/tx_retries dos rádios quando device não os expõe', () => {
+    // Firmware visto em campo (UniFi OS 9.x + Wave 1/2): controller só envia
+    // tx_bytes no nível do device; tx_packets/tx_retries vêm só por rádio.
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      name: 'BUBA-AP-01',
+      tx_bytes: 524343528,
+      // tx_packets/tx_dropped/tx_errors/tx_retries ausentes intencionalmente
+      radio_table_stats: [
+        { radio: 'ng', tx_packets: 100, tx_retries: 30 },
+        { radio: 'na', tx_packets: 400, tx_retries: 70 },
+      ],
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.txBytes).toBe(524343528);
+    expect(agg.txPackets).toBe(500); // 100 + 400
+    expect(agg.txRetries).toBe(100); // 30 + 70
+    // controller não expõe → ficam null mesmo
+    expect(agg.txDropped).toBeNull();
+    expect(agg.txErrors).toBeNull();
+  });
+
+  it('prefere valor do device-level quando ambos vêm preenchidos', () => {
+    // Evita salto de counter se o firmware passar a expor o campo no futuro:
+    // sempre que o controller declara, respeitamos o número dele.
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      tx_packets: 999_999,
+      tx_retries: 888,
+      radio_table_stats: [
+        { radio: 'ng', tx_packets: 100, tx_retries: 30 },
+        { radio: 'na', tx_packets: 400, tx_retries: 70 },
+      ],
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.txPackets).toBe(999_999);
+    expect(agg.txRetries).toBe(888);
+  });
+
+  it('mantém null quando nem device nem rádios reportam o campo', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      radio_table_stats: [{ radio: 'ng' }, { radio: 'na' }],
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.txPackets).toBeNull();
+    expect(agg.txRetries).toBeNull();
+  });
 });
 
 describe('computeSiteAggregate', () => {

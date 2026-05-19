@@ -79,19 +79,47 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
     }
   }
 
+  // Alguns firmwares (visto em UniFi OS 9.x com APs Wave 1/2) NÃO expõem
+  // `tx_packets`/`tx_retries` no nível do device — só por rádio. Sem esse
+  // fallback, `d_tx_packets`/`d_tx_retries` no device-aggregate vivem NULL e
+  // o Dashboard (que agrega por device) mostra "0" em "Pkts TX" e "Retx".
+  // Somamos os rádios como segunda fonte; preferimos sempre o valor declarado
+  // pelo controller quando ele vem, evitando salto de counter ao trocar de
+  // fonte caso o firmware comece a expor o campo no futuro.
+  const radioTotals = sumRadioCounters(radioSamples);
+
   const deviceAggregate: ParsedSample = {
     deviceMac: mac,
     radio: null,
     clientMac: null,
     clientCount: intOrNull(d.num_sta),
     txBytes: intOrNull(d.tx_bytes),
-    txPackets: intOrNull(d.tx_packets),
+    txPackets: intOrNull(d.tx_packets) ?? radioTotals.txPackets,
     txDropped: intOrNull(d.tx_dropped),
     txErrors: intOrNull(d.tx_errors),
-    txRetries: intOrNull(d.tx_retries),
+    txRetries: intOrNull(d.tx_retries) ?? radioTotals.txRetries,
   };
 
   return { device, samples: [...radioSamples, deviceAggregate] };
+}
+
+/**
+ * Soma os counters cumulativos dos rádios para servir de fallback quando o
+ * device-level do payload UniFi não os expõe. Retorna `null` quando nenhum
+ * rádio reportou o campo (não inventa zeros).
+ */
+function sumRadioCounters(samples: ParsedSample[]): {
+  txPackets: number | null;
+  txRetries: number | null;
+} {
+  let txPackets: number | null = null;
+  let txRetries: number | null = null;
+  for (const s of samples) {
+    if (s.radio === null) continue;
+    if (s.txPackets !== null) txPackets = (txPackets ?? 0) + s.txPackets;
+    if (s.txRetries !== null) txRetries = (txRetries ?? 0) + s.txRetries;
+  }
+  return { txPackets, txRetries };
 }
 
 /**
