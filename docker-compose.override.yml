@@ -1,0 +1,7 @@
+services:
+  metricas-unifi:
+    image: !reset null
+    build:
+      context: .
+      dockerfile: Dockerfile
+    pull_policy: never
