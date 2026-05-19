@@ -73,6 +73,12 @@ export const devices = sqliteTable(
     type: text('type').notNull(),
     firstSeen: integer('first_seen').notNull(),
     lastSeen: integer('last_seen'),
+    /** Versão de firmware reportada pelo controller (ex: "6.6.74.15103"). */
+    version: text('version'),
+    /** Serial number do hardware — útil para inventário / RMA. */
+    serial: text('serial'),
+    /** Estado conforme reportado pelo UniFi: 1=connected, 0=disconnected. */
+    state: integer('state'),
   },
   (t) => ({
     ctrlMacUnique: uniqueIndex('devices_controller_mac_unique').on(t.controllerId, t.mac),
@@ -114,6 +120,21 @@ const metricsColumns = {
   dRxPackets: integer('d_rx_packets'),
   dRxDropped: integer('d_rx_dropped'),
   dRxErrors: integer('d_rx_errors'),
+  // Contadores adicionais (cumulativos) e seus deltas.
+  wifiTxAttempts: integer('wifi_tx_attempts'),
+  wifiTxDropped: integer('wifi_tx_dropped'),
+  rxCrypts: integer('rx_crypts'),
+  macFilterRejections: integer('mac_filter_rejections'),
+  numRoamEvents: integer('num_roam_events'),
+  dWifiTxAttempts: integer('d_wifi_tx_attempts'),
+  dWifiTxDropped: integer('d_wifi_tx_dropped'),
+  dRxCrypts: integer('d_rx_crypts'),
+  dMacFilterRejections: integer('d_mac_filter_rejections'),
+  dNumRoamEvents: integer('d_num_roam_events'),
+  // Gauges (não-cumulativos).
+  cpuPct: real('cpu_pct'),
+  memPct: real('mem_pct'),
+  uptimeSec: integer('uptime_sec'),
   retryRate: real('retry_rate'),
   errorRate: real('error_rate'),
   dropRate: real('drop_rate'),

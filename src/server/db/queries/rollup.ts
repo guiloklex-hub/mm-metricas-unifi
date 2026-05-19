@@ -36,8 +36,13 @@ function buildRollupSql(opts: {
       client_count,
       tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
       rx_bytes, rx_packets, rx_dropped, rx_errors,
+      wifi_tx_attempts, wifi_tx_dropped, rx_crypts,
+      mac_filter_rejections, num_roam_events,
       d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
       d_rx_bytes, d_rx_packets, d_rx_dropped, d_rx_errors,
+      d_wifi_tx_attempts, d_wifi_tx_dropped, d_rx_crypts,
+      d_mac_filter_rejections, d_num_roam_events,
+      cpu_pct, mem_pct, uptime_sec,
       retry_rate, error_rate, drop_rate
     )
     SELECT
@@ -53,6 +58,11 @@ function buildRollupSql(opts: {
       MAX(rx_packets) AS rx_packets,
       MAX(rx_dropped) AS rx_dropped,
       MAX(rx_errors)  AS rx_errors,
+      MAX(wifi_tx_attempts)      AS wifi_tx_attempts,
+      MAX(wifi_tx_dropped)       AS wifi_tx_dropped,
+      MAX(rx_crypts)             AS rx_crypts,
+      MAX(mac_filter_rejections) AS mac_filter_rejections,
+      MAX(num_roam_events)       AS num_roam_events,
       SUM(d_tx_bytes)   AS d_tx_bytes,
       SUM(d_tx_packets) AS d_tx_packets,
       SUM(d_tx_dropped) AS d_tx_dropped,
@@ -62,8 +72,17 @@ function buildRollupSql(opts: {
       SUM(d_rx_packets) AS d_rx_packets,
       SUM(d_rx_dropped) AS d_rx_dropped,
       SUM(d_rx_errors)  AS d_rx_errors,
-      CASE WHEN SUM(d_tx_packets) > 0
-           THEN 1.0 * SUM(d_tx_retries) / SUM(d_tx_packets) END AS retry_rate,
+      SUM(d_wifi_tx_attempts)      AS d_wifi_tx_attempts,
+      SUM(d_wifi_tx_dropped)       AS d_wifi_tx_dropped,
+      SUM(d_rx_crypts)             AS d_rx_crypts,
+      SUM(d_mac_filter_rejections) AS d_mac_filter_rejections,
+      SUM(d_num_roam_events)       AS d_num_roam_events,
+      AVG(cpu_pct) AS cpu_pct,
+      AVG(mem_pct) AS mem_pct,
+      MAX(uptime_sec) AS uptime_sec,
+      CASE WHEN COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) > 0
+           THEN 1.0 * SUM(d_tx_retries)
+                / COALESCE(SUM(d_wifi_tx_attempts), SUM(d_tx_packets)) END AS retry_rate,
       CASE WHEN SUM(d_tx_packets) > 0
            THEN 1.0 * SUM(d_tx_errors) / SUM(d_tx_packets)  END AS error_rate,
       CASE WHEN SUM(d_tx_packets) > 0
@@ -83,6 +102,11 @@ function buildRollupSql(opts: {
       rx_packets = excluded.rx_packets,
       rx_dropped = excluded.rx_dropped,
       rx_errors = excluded.rx_errors,
+      wifi_tx_attempts = excluded.wifi_tx_attempts,
+      wifi_tx_dropped = excluded.wifi_tx_dropped,
+      rx_crypts = excluded.rx_crypts,
+      mac_filter_rejections = excluded.mac_filter_rejections,
+      num_roam_events = excluded.num_roam_events,
       d_tx_bytes = excluded.d_tx_bytes,
       d_tx_packets = excluded.d_tx_packets,
       d_tx_dropped = excluded.d_tx_dropped,
@@ -92,6 +116,14 @@ function buildRollupSql(opts: {
       d_rx_packets = excluded.d_rx_packets,
       d_rx_dropped = excluded.d_rx_dropped,
       d_rx_errors = excluded.d_rx_errors,
+      d_wifi_tx_attempts = excluded.d_wifi_tx_attempts,
+      d_wifi_tx_dropped = excluded.d_wifi_tx_dropped,
+      d_rx_crypts = excluded.d_rx_crypts,
+      d_mac_filter_rejections = excluded.d_mac_filter_rejections,
+      d_num_roam_events = excluded.d_num_roam_events,
+      cpu_pct = excluded.cpu_pct,
+      mem_pct = excluded.mem_pct,
+      uptime_sec = excluded.uptime_sec,
       retry_rate = excluded.retry_rate,
       error_rate = excluded.error_rate,
       drop_rate = excluded.drop_rate

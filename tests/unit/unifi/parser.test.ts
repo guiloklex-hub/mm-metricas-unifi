@@ -62,6 +62,9 @@ describe('parseDevicePayload — fixture realista', () => {
       name: 'AP-Loja-01',
       model: 'U6-Pro',
       type: 'uap',
+      version: null,
+      serial: null,
+      state: null,
     });
   });
 
@@ -208,6 +211,57 @@ describe('parseDevicePayload — fixture realista', () => {
     // novos campos antes irrecuperáveis
     expect(agg.txDropped).toBe(0);
     expect(agg.txErrors).toBe(36615);
+  });
+
+  it('captura CPU/mem/uptime de system-stats e top-level uptime', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      uptime: 17532,
+      'system-stats': { cpu: '17.7', mem: '48.3', uptime: '17532' },
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.cpuPct).toBe(17.7);
+    expect(agg.memPct).toBe(48.3);
+    expect(agg.uptimeSec).toBe(17532);
+  });
+
+  it('captura wifi_tx_attempts, rx_crypts, mac_filter_rejections, roam_events', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      stat: {
+        ap: {
+          wifi_tx_attempts: 248723,
+          wifi_tx_dropped: 945,
+          rx_crypts: 1294,
+          mac_filter_rejections: 3954,
+          num_wifi_roam_to_events: 135,
+        },
+      },
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.wifiTxAttempts).toBe(248723);
+    expect(agg.wifiTxDropped).toBe(945);
+    expect(agg.rxCrypts).toBe(1294);
+    expect(agg.macFilterRejections).toBe(3954);
+    expect(agg.numRoamEvents).toBe(135);
+  });
+
+  it('captura version, serial e state no ParsedDevice', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      version: '6.6.74.15103',
+      serial: 'F492BF13A958',
+      state: 1,
+    };
+    const r = parseDevicePayload(payload)!;
+    expect(r.device.version).toBe('6.6.74.15103');
+    expect(r.device.serial).toBe('F492BF13A958');
+    expect(r.device.state).toBe(1);
   });
 
   it('top-level vence stat.ap quando ambos estão preenchidos', () => {

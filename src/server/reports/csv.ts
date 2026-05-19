@@ -51,6 +51,14 @@ export const METRIC_CSV_HEADER = csvRow([
   'd_rx_packets',
   'd_rx_dropped',
   'd_rx_errors',
+  'd_wifi_tx_attempts',
+  'd_wifi_tx_dropped',
+  'd_rx_crypts',
+  'd_mac_filter_rejections',
+  'd_num_roam_events',
+  'cpu_pct',
+  'mem_pct',
+  'uptime_sec',
   'retry_rate',
   'error_rate',
   'drop_rate',
@@ -73,6 +81,14 @@ export interface CsvMetricRow {
   dRxPackets: number | null;
   dRxDropped: number | null;
   dRxErrors: number | null;
+  dWifiTxAttempts: number | null;
+  dWifiTxDropped: number | null;
+  dRxCrypts: number | null;
+  dMacFilterRejections: number | null;
+  dNumRoamEvents: number | null;
+  cpuPct: number | null;
+  memPct: number | null;
+  uptimeSec: number | null;
   retryRate: number | null;
   errorRate: number | null;
   dropRate: number | null;
@@ -99,6 +115,14 @@ export function metricRowToCsv(r: CsvMetricRow): string {
     r.dRxPackets,
     r.dRxDropped,
     r.dRxErrors,
+    r.dWifiTxAttempts,
+    r.dWifiTxDropped,
+    r.dRxCrypts,
+    r.dMacFilterRejections,
+    r.dNumRoamEvents,
+    r.cpuPct,
+    r.memPct,
+    r.uptimeSec,
     r.retryRate,
     r.errorRate,
     r.dropRate,
@@ -127,6 +151,14 @@ const COMMON_METRIC_COLS = [
   'd_rx_packets',
   'd_rx_dropped',
   'd_rx_errors',
+  'd_wifi_tx_attempts',
+  'd_wifi_tx_dropped',
+  'd_rx_crypts',
+  'd_mac_filter_rejections',
+  'd_num_roam_events',
+  'cpu_pct',
+  'mem_pct',
+  'uptime_sec',
   'retry_rate',
   'error_rate',
   'drop_rate',
@@ -208,6 +240,14 @@ function commonMetricValues(r: MetricRow): Array<number | null> {
     r.dRxPackets,
     r.dRxDropped,
     r.dRxErrors,
+    r.dWifiTxAttempts,
+    r.dWifiTxDropped,
+    r.dRxCrypts,
+    r.dMacFilterRejections,
+    r.dNumRoamEvents,
+    r.cpuPct,
+    r.memPct,
+    r.uptimeSec,
     r.retryRate,
     r.errorRate,
     r.dropRate,

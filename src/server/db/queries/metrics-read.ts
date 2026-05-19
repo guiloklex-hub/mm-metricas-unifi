@@ -25,6 +25,14 @@ export interface MetricRow {
   dRxPackets: number | null;
   dRxDropped: number | null;
   dRxErrors: number | null;
+  dWifiTxAttempts: number | null;
+  dWifiTxDropped: number | null;
+  dRxCrypts: number | null;
+  dMacFilterRejections: number | null;
+  dNumRoamEvents: number | null;
+  cpuPct: number | null;
+  memPct: number | null;
+  uptimeSec: number | null;
   retryRate: number | null;
   errorRate: number | null;
   dropRate: number | null;
@@ -104,6 +112,12 @@ export function queryMetrics(
            d_tx_retries AS dTxRetries,
            d_rx_bytes AS dRxBytes, d_rx_packets AS dRxPackets,
            d_rx_dropped AS dRxDropped, d_rx_errors AS dRxErrors,
+           d_wifi_tx_attempts AS dWifiTxAttempts,
+           d_wifi_tx_dropped AS dWifiTxDropped,
+           d_rx_crypts AS dRxCrypts,
+           d_mac_filter_rejections AS dMacFilterRejections,
+           d_num_roam_events AS dNumRoamEvents,
+           cpu_pct AS cpuPct, mem_pct AS memPct, uptime_sec AS uptimeSec,
            retry_rate AS retryRate, error_rate AS errorRate, drop_rate AS dropRate
     FROM ${table}
     WHERE ${where.join(' AND ')}
@@ -128,6 +142,14 @@ export function queryMetrics(
     dRxPackets: number | null;
     dRxDropped: number | null;
     dRxErrors: number | null;
+    dWifiTxAttempts: number | null;
+    dWifiTxDropped: number | null;
+    dRxCrypts: number | null;
+    dMacFilterRejections: number | null;
+    dNumRoamEvents: number | null;
+    cpuPct: number | null;
+    memPct: number | null;
+    uptimeSec: number | null;
     retryRate: number | null;
     errorRate: number | null;
     dropRate: number | null;
@@ -150,6 +172,14 @@ export function queryMetrics(
     dRxPackets: r.dRxPackets,
     dRxDropped: r.dRxDropped,
     dRxErrors: r.dRxErrors,
+    dWifiTxAttempts: r.dWifiTxAttempts,
+    dWifiTxDropped: r.dWifiTxDropped,
+    dRxCrypts: r.dRxCrypts,
+    dMacFilterRejections: r.dMacFilterRejections,
+    dNumRoamEvents: r.dNumRoamEvents,
+    cpuPct: r.cpuPct,
+    memPct: r.memPct,
+    uptimeSec: r.uptimeSec,
     retryRate: r.retryRate,
     errorRate: r.errorRate,
     dropRate: r.dropRate,

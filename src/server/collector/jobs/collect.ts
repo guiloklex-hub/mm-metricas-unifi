@@ -163,6 +163,9 @@ async function collectSite(
       model: r.device.model,
       type: r.device.type,
       seenAt,
+      version: r.device.version,
+      serial: r.device.serial,
+      state: r.device.state,
     });
     macToDeviceId.set(r.device.mac, id);
   }
@@ -221,6 +224,14 @@ function toMetricInput(
     rxPackets: sample.rxPackets,
     rxDropped: sample.rxDropped,
     rxErrors: sample.rxErrors,
+    wifiTxAttempts: sample.wifiTxAttempts,
+    wifiTxDropped: sample.wifiTxDropped,
+    rxCrypts: sample.rxCrypts,
+    macFilterRejections: sample.macFilterRejections,
+    numRoamEvents: sample.numRoamEvents,
+    cpuPct: sample.cpuPct,
+    memPct: sample.memPct,
+    uptimeSec: sample.uptimeSec,
   };
 }
 

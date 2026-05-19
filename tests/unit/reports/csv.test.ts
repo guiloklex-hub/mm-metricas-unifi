@@ -58,6 +58,14 @@ describe('metricRowToCsv', () => {
       dRxPackets: 80,
       dRxDropped: 0,
       dRxErrors: 0,
+      dWifiTxAttempts: 110,
+      dWifiTxDropped: 1,
+      dRxCrypts: 0,
+      dMacFilterRejections: 0,
+      dNumRoamEvents: 2,
+      cpuPct: 12.5,
+      memPct: 48,
+      uptimeSec: 3600,
       retryRate: 0.05,
       errorRate: 0,
       dropRate: 0,
@@ -66,7 +74,10 @@ describe('metricRowToCsv', () => {
     expect(out).toContain('2023-11-14');
     expect(out).toContain('ctrl-1');
     expect(out).toContain('site-1');
-    expect(out).toMatch(/,24,1000,100,0,0,5,800,80,0,0,0.05,0,0\n$/);
+    // Linha completa para validar que ordem das colunas está correta.
+    expect(out).toBe(
+      '1700000000,2023-11-14T22:13:20.000Z,ctrl-1,site-1,,,,24,1000,100,0,0,5,800,80,0,0,110,1,0,0,2,12.5,48,3600,0.05,0,0\n',
+    );
   });
 
   it('campos null viram vazio', () => {
@@ -87,10 +98,20 @@ describe('metricRowToCsv', () => {
       dRxPackets: null,
       dRxDropped: null,
       dRxErrors: null,
+      dWifiTxAttempts: null,
+      dWifiTxDropped: null,
+      dRxCrypts: null,
+      dMacFilterRejections: null,
+      dNumRoamEvents: null,
+      cpuPct: null,
+      memPct: null,
+      uptimeSec: null,
       retryRate: null,
       errorRate: null,
       dropRate: null,
     });
-    expect(out).toMatch(/^0,1970-01-01T00:00:00\.000Z,c,s,,,,,,,,,,,,,,,,\n$/);
+    // 27 colunas (ts, iso, ctrl, site, dev, radio, client, count + 19 metrics + 3 rates)
+    // todas vazias depois de ts e iso, sendo ctrl='c', site='s'.
+    expect(out).toBe(`0,1970-01-01T00:00:00.000Z,c,s${','.repeat(24)}\n`);
   });
 });

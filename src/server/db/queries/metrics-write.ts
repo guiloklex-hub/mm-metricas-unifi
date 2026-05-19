@@ -33,6 +33,15 @@ export interface MetricSampleInput {
   rxPackets: number | null;
   rxDropped: number | null;
   rxErrors: number | null;
+  wifiTxAttempts: number | null;
+  wifiTxDropped: number | null;
+  rxCrypts: number | null;
+  macFilterRejections: number | null;
+  numRoamEvents: number | null;
+  // Gauges (não geram delta).
+  cpuPct: number | null;
+  memPct: number | null;
+  uptimeSec: number | null;
 }
 
 const METRIC_NAMES = [
@@ -45,6 +54,11 @@ const METRIC_NAMES = [
   'rx_packets',
   'rx_dropped',
   'rx_errors',
+  'wifi_tx_attempts',
+  'wifi_tx_dropped',
+  'rx_crypts',
+  'mac_filter_rejections',
+  'num_roam_events',
 ] as const;
 type MetricName = (typeof METRIC_NAMES)[number];
 
@@ -68,6 +82,16 @@ function counterValue(sample: MetricSampleInput, metric: MetricName): number | n
       return sample.rxDropped;
     case 'rx_errors':
       return sample.rxErrors;
+    case 'wifi_tx_attempts':
+      return sample.wifiTxAttempts;
+    case 'wifi_tx_dropped':
+      return sample.wifiTxDropped;
+    case 'rx_crypts':
+      return sample.rxCrypts;
+    case 'mac_filter_rejections':
+      return sample.macFilterRejections;
+    case 'num_roam_events':
+      return sample.numRoamEvents;
   }
 }
 
@@ -92,11 +116,27 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
        client_count,
        tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
        rx_bytes, rx_packets, rx_dropped, rx_errors,
+       wifi_tx_attempts, wifi_tx_dropped, rx_crypts,
+       mac_filter_rejections, num_roam_events,
        d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
        d_rx_bytes, d_rx_packets, d_rx_dropped, d_rx_errors,
+       d_wifi_tx_attempts, d_wifi_tx_dropped, d_rx_crypts,
+       d_mac_filter_rejections, d_num_roam_events,
+       cpu_pct, mem_pct, uptime_sec,
        retry_rate, error_rate, drop_rate
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?,
+             ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?,
+             ?, ?, ?,
+             ?, ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?,
+             ?, ?, ?,
+             ?, ?,
+             ?, ?, ?,
+             ?, ?, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO UPDATE SET
        client_count = excluded.client_count,
        tx_bytes = excluded.tx_bytes,
@@ -108,6 +148,11 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
        rx_packets = excluded.rx_packets,
        rx_dropped = excluded.rx_dropped,
        rx_errors = excluded.rx_errors,
+       wifi_tx_attempts = excluded.wifi_tx_attempts,
+       wifi_tx_dropped = excluded.wifi_tx_dropped,
+       rx_crypts = excluded.rx_crypts,
+       mac_filter_rejections = excluded.mac_filter_rejections,
+       num_roam_events = excluded.num_roam_events,
        d_tx_bytes = excluded.d_tx_bytes,
        d_tx_packets = excluded.d_tx_packets,
        d_tx_dropped = excluded.d_tx_dropped,
@@ -117,6 +162,14 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
        d_rx_packets = excluded.d_rx_packets,
        d_rx_dropped = excluded.d_rx_dropped,
        d_rx_errors = excluded.d_rx_errors,
+       d_wifi_tx_attempts = excluded.d_wifi_tx_attempts,
+       d_wifi_tx_dropped = excluded.d_wifi_tx_dropped,
+       d_rx_crypts = excluded.d_rx_crypts,
+       d_mac_filter_rejections = excluded.d_mac_filter_rejections,
+       d_num_roam_events = excluded.d_num_roam_events,
+       cpu_pct = excluded.cpu_pct,
+       mem_pct = excluded.mem_pct,
+       uptime_sec = excluded.uptime_sec,
        retry_rate = excluded.retry_rate,
        error_rate = excluded.error_rate,
        drop_rate = excluded.drop_rate`,
@@ -163,10 +216,22 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
       const dRxPackets = computeDelta(s.rxPackets, last.rx_packets ?? null);
       const dRxDropped = computeDelta(s.rxDropped, last.rx_dropped ?? null);
       const dRxErrors = computeDelta(s.rxErrors, last.rx_errors ?? null);
+      const dWifiTxAttempts = computeDelta(s.wifiTxAttempts, last.wifi_tx_attempts ?? null);
+      const dWifiTxDropped = computeDelta(s.wifiTxDropped, last.wifi_tx_dropped ?? null);
+      const dRxCrypts = computeDelta(s.rxCrypts, last.rx_crypts ?? null);
+      const dMacFilterRejections = computeDelta(
+        s.macFilterRejections,
+        last.mac_filter_rejections ?? null,
+      );
+      const dNumRoamEvents = computeDelta(s.numRoamEvents, last.num_roam_events ?? null);
 
       if (detectReset(s, last)) resetSignals += 1;
 
-      const retryRate = rate(dTxRetries, dTxPackets);
+      // retry_rate agora usa wifi_tx_attempts como denominador (mais preciso).
+      // Fallback para d_tx_packets quando o firmware não expõe attempts —
+      // mantém compat com fixtures antigas.
+      const retryDenominator = dWifiTxAttempts ?? dTxPackets;
+      const retryRate = rate(dTxRetries, retryDenominator);
       const errorRate = rate(dTxErrors, dTxPackets);
       const dropRate = rate(dTxDropped, dTxPackets);
 
@@ -187,6 +252,11 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
         s.rxPackets,
         s.rxDropped,
         s.rxErrors,
+        s.wifiTxAttempts,
+        s.wifiTxDropped,
+        s.rxCrypts,
+        s.macFilterRejections,
+        s.numRoamEvents,
         dTxBytes,
         dTxPackets,
         dTxDropped,
@@ -196,6 +266,14 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
         dRxPackets,
         dRxDropped,
         dRxErrors,
+        dWifiTxAttempts,
+        dWifiTxDropped,
+        dRxCrypts,
+        dMacFilterRejections,
+        dNumRoamEvents,
+        s.cpuPct,
+        s.memPct,
+        s.uptimeSec,
         retryRate,
         errorRate,
         dropRate,
@@ -283,16 +361,26 @@ export function insertHistoricalSamples(
        client_count,
        tx_bytes, tx_packets, tx_dropped, tx_errors, tx_retries,
        rx_bytes, rx_packets, rx_dropped, rx_errors,
+       wifi_tx_attempts, wifi_tx_dropped, rx_crypts,
+       mac_filter_rejections, num_roam_events,
        d_tx_bytes, d_tx_packets, d_tx_dropped, d_tx_errors, d_tx_retries,
        d_rx_bytes, d_rx_packets, d_rx_dropped, d_rx_errors,
+       d_wifi_tx_attempts, d_wifi_tx_dropped, d_rx_crypts,
+       d_mac_filter_rejections, d_num_roam_events,
+       cpu_pct, mem_pct, uptime_sec,
        retry_rate, error_rate, drop_rate
      )
      VALUES (?, ?, ?, ?, '', '',
              ?,
              NULL, NULL, NULL, NULL, NULL,
              NULL, NULL, NULL, NULL,
+             NULL, NULL, NULL,
+             NULL, NULL,
              ?, ?, ?, NULL, NULL,
              NULL, NULL, NULL, NULL,
+             NULL, NULL, NULL,
+             NULL, NULL,
+             NULL, NULL, NULL,
              NULL, NULL, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO NOTHING`,
   );

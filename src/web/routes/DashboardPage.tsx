@@ -8,7 +8,14 @@ import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/Tim
 import { Card } from '../components/ui/Card.tsx';
 import { QueryState } from '../components/ui/QueryState.tsx';
 import { deviceLabelWithMac } from '../lib/device-label.ts';
-import { formatBytes, formatNumber, formatRate, formatRelative } from '../lib/format.ts';
+import {
+  formatBytes,
+  formatNumber,
+  formatPercent,
+  formatRate,
+  formatRelative,
+  formatUptime,
+} from '../lib/format.ts';
 
 type Window = '6h' | '24h' | '7d';
 
@@ -200,6 +207,24 @@ export function DashboardPage() {
                   <th className="px-3 py-2">Retx %</th>
                   <th className="px-3 py-2">Erro %</th>
                   <th className="px-3 py-2">Drop %</th>
+                  <th
+                    className="px-3 py-2"
+                    title="CPU média do AP na janela (gauge)"
+                  >
+                    CPU %
+                  </th>
+                  <th
+                    className="px-3 py-2"
+                    title="Memória média do AP na janela (gauge)"
+                  >
+                    Mem %
+                  </th>
+                  <th
+                    className="px-3 py-2"
+                    title="Tempo desde o último boot do AP (segundos)"
+                  >
+                    Uptime
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -219,6 +244,9 @@ export function DashboardPage() {
                     <td className="px-3 py-2">{formatRate(r.avgRetryRate)}</td>
                     <td className="px-3 py-2">{formatRate(r.avgErrorRate)}</td>
                     <td className="px-3 py-2">{formatRate(r.avgDropRate)}</td>
+                    <td className="px-3 py-2">{formatPercent(r.avgCpuPct)}</td>
+                    <td className="px-3 py-2">{formatPercent(r.avgMemPct)}</td>
+                    <td className="px-3 py-2">{formatUptime(r.lastUptimeSec)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -271,6 +299,9 @@ interface DeviceRowSummary {
   avgRetryRate: number | null;
   avgErrorRate: number | null;
   avgDropRate: number | null;
+  avgCpuPct: number | null;
+  avgMemPct: number | null;
+  lastUptimeSec: number | null;
 }
 
 function summarizeDevices(
@@ -288,6 +319,9 @@ function summarizeDevices(
     retryRate: number | null;
     errorRate: number | null;
     dropRate: number | null;
+    cpuPct: number | null;
+    memPct: number | null;
+    uptimeSec: number | null;
   }>,
   aliasMap: Map<string, string>,
 ): DeviceRowSummary[] {
@@ -300,6 +334,10 @@ function summarizeDevices(
       _errN: number;
       _dropSum: number;
       _dropN: number;
+      _cpuSum: number;
+      _cpuN: number;
+      _memSum: number;
+      _memN: number;
     }
   >();
   for (const r of rows) {
@@ -322,12 +360,19 @@ function summarizeDevices(
         avgRetryRate: null,
         avgErrorRate: null,
         avgDropRate: null,
+        avgCpuPct: null,
+        avgMemPct: null,
+        lastUptimeSec: null,
         _retrySum: 0,
         _retryN: 0,
         _errSum: 0,
         _errN: 0,
         _dropSum: 0,
         _dropN: 0,
+        _cpuSum: 0,
+        _cpuN: 0,
+        _memSum: 0,
+        _memN: 0,
       };
       acc.set(r.deviceId, cur);
     }
@@ -356,6 +401,20 @@ function summarizeDevices(
       cur._dropSum += r.dropRate;
       cur._dropN += 1;
     }
+    if (r.cpuPct != null) {
+      cur._cpuSum += r.cpuPct;
+      cur._cpuN += 1;
+    }
+    if (r.memPct != null) {
+      cur._memSum += r.memPct;
+      cur._memN += 1;
+    }
+    if (r.uptimeSec != null) {
+      // Maior uptime na janela = mais recente (gauge monotônico). Captura
+      // ultimo valor sem precisar de ordem temporal explícita das amostras.
+      cur.lastUptimeSec =
+        cur.lastUptimeSec == null ? r.uptimeSec : Math.max(cur.lastUptimeSec, r.uptimeSec);
+    }
   }
   const out: DeviceRowSummary[] = [];
   for (const v of acc.values()) {
@@ -375,6 +434,9 @@ function summarizeDevices(
       avgRetryRate: v._retryN ? v._retrySum / v._retryN : null,
       avgErrorRate: v._errN ? v._errSum / v._errN : null,
       avgDropRate: v._dropN ? v._dropSum / v._dropN : null,
+      avgCpuPct: v._cpuN ? v._cpuSum / v._cpuN : null,
+      avgMemPct: v._memN ? v._memSum / v._memN : null,
+      lastUptimeSec: v.lastUptimeSec,
     });
   }
   return out.sort((a, b) => b.totalBytes - a.totalBytes);

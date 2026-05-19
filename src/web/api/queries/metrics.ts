@@ -18,6 +18,14 @@ export interface MetricRow {
   dRxPackets: number | null;
   dRxDropped: number | null;
   dRxErrors: number | null;
+  dWifiTxAttempts: number | null;
+  dWifiTxDropped: number | null;
+  dRxCrypts: number | null;
+  dMacFilterRejections: number | null;
+  dNumRoamEvents: number | null;
+  cpuPct: number | null;
+  memPct: number | null;
+  uptimeSec: number | null;
   retryRate: number | null;
   errorRate: number | null;
   dropRate: number | null;

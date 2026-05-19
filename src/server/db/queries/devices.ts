@@ -14,6 +14,9 @@ export interface DeviceRow {
   type: string;
   firstSeen: number;
   lastSeen: number | null;
+  version: string | null;
+  serial: string | null;
+  state: number | null;
 }
 
 export interface UpsertDeviceInput {
@@ -24,6 +27,9 @@ export interface UpsertDeviceInput {
   model: string | null;
   type: string;
   seenAt: number;
+  version?: string | null;
+  serial?: string | null;
+  state?: number | null;
 }
 
 export function upsertDevice(db: DB, input: UpsertDeviceInput): string {
@@ -40,6 +46,9 @@ export function upsertDevice(db: DB, input: UpsertDeviceInput): string {
         type: input.type,
         siteId: input.siteId,
         lastSeen: input.seenAt,
+        version: input.version ?? existing.version,
+        serial: input.serial ?? existing.serial,
+        state: input.state ?? existing.state,
       })
       .where(eq(devices.id, existing.id))
       .run();
@@ -57,6 +66,9 @@ export function upsertDevice(db: DB, input: UpsertDeviceInput): string {
       type: input.type,
       firstSeen: input.seenAt,
       lastSeen: input.seenAt,
+      version: input.version ?? null,
+      serial: input.serial ?? null,
+      state: input.state ?? null,
     })
     .run();
   return id;
@@ -196,6 +208,9 @@ function toDeviceRow(row: {
   type: string;
   firstSeen: number;
   lastSeen: number | null;
+  version: string | null;
+  serial: string | null;
+  state: number | null;
 }): DeviceRow {
   return {
     id: row.id,
@@ -208,5 +223,8 @@ function toDeviceRow(row: {
     type: row.type,
     firstSeen: row.firstSeen,
     lastSeen: row.lastSeen,
+    version: row.version,
+    serial: row.serial,
+    state: row.state,
   };
 }

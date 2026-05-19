@@ -20,6 +20,9 @@ export interface ParsedDevice {
   name: string | null;
   model: string | null;
   type: string; // 'uap' | 'usw' | 'ugw' | outros
+  version: string | null;
+  serial: string | null;
+  state: number | null;
 }
 
 export interface ParsedSample {
@@ -37,6 +40,16 @@ export interface ParsedSample {
   rxPackets: number | null;
   rxDropped: number | null;
   rxErrors: number | null;
+  // Contadores adicionais (apenas device-aggregate, null em radio/cliente).
+  wifiTxAttempts: number | null;
+  wifiTxDropped: number | null;
+  rxCrypts: number | null;
+  macFilterRejections: number | null;
+  numRoamEvents: number | null;
+  // Gauges (snapshots, não-cumulativos).
+  cpuPct: number | null;
+  memPct: number | null;
+  uptimeSec: number | null;
 }
 
 export interface ParsedDeviceResult {
@@ -60,6 +73,9 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
     name: pickString(d.name),
     model: pickString(d.model),
     type: typeof d.type === 'string' ? d.type : 'unknown',
+    version: pickString(d.version),
+    serial: pickString(d.serial),
+    state: typeof d.state === 'number' ? d.state : null,
   };
 
   const radioSamples: ParsedSample[] = [];
@@ -83,6 +99,14 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
         rxPackets: null,
         rxDropped: null,
         rxErrors: null,
+        wifiTxAttempts: null,
+        wifiTxDropped: null,
+        rxCrypts: null,
+        macFilterRejections: null,
+        numRoamEvents: null,
+        cpuPct: null,
+        memPct: null,
+        uptimeSec: null,
       });
     }
   }
@@ -98,6 +122,7 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
   const stat = d.stat?.ap;
   const radioTotals = sumRadioCounters(radioSamples);
 
+  const sysStats = d['system-stats'];
   const deviceAggregate: ParsedSample = {
     deviceMac: mac,
     radio: null,
@@ -116,6 +141,14 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
     rxPackets: intOrNull(stat?.rx_packets) ?? intOrNull(d.rx_packets),
     rxDropped: intOrNull(stat?.rx_dropped),
     rxErrors: intOrNull(stat?.rx_errors),
+    wifiTxAttempts: intOrNull(stat?.wifi_tx_attempts),
+    wifiTxDropped: intOrNull(stat?.wifi_tx_dropped),
+    rxCrypts: intOrNull(stat?.rx_crypts),
+    macFilterRejections: intOrNull(stat?.mac_filter_rejections),
+    numRoamEvents: intOrNull(stat?.num_wifi_roam_to_events),
+    cpuPct: floatOrNull(sysStats?.cpu),
+    memPct: floatOrNull(sysStats?.mem),
+    uptimeSec: intOrNull(d.uptime) ?? intOrNull(sysStats?.uptime),
   };
 
   return { device, samples: [...radioSamples, deviceAggregate] };
@@ -159,6 +192,14 @@ export function computeSiteAggregate(samples: ParsedSample[]): ParsedSample {
     rxPackets: null,
     rxDropped: null,
     rxErrors: null,
+    wifiTxAttempts: null,
+    wifiTxDropped: null,
+    rxCrypts: null,
+    macFilterRejections: null,
+    numRoamEvents: null,
+    cpuPct: null,
+    memPct: null,
+    uptimeSec: null,
   };
   for (const s of samples) {
     if (s.deviceMac === null) continue; // já é agregado
@@ -174,6 +215,15 @@ export function computeSiteAggregate(samples: ParsedSample[]): ParsedSample {
     aggregate.rxPackets = sumNullable(aggregate.rxPackets, s.rxPackets);
     aggregate.rxDropped = sumNullable(aggregate.rxDropped, s.rxDropped);
     aggregate.rxErrors = sumNullable(aggregate.rxErrors, s.rxErrors);
+    aggregate.wifiTxAttempts = sumNullable(aggregate.wifiTxAttempts, s.wifiTxAttempts);
+    aggregate.wifiTxDropped = sumNullable(aggregate.wifiTxDropped, s.wifiTxDropped);
+    aggregate.rxCrypts = sumNullable(aggregate.rxCrypts, s.rxCrypts);
+    aggregate.macFilterRejections = sumNullable(
+      aggregate.macFilterRejections,
+      s.macFilterRejections,
+    );
+    aggregate.numRoamEvents = sumNullable(aggregate.numRoamEvents, s.numRoamEvents);
+    // CPU/mem/uptime são gauges — agregar via SUM não faz sentido; ficam null.
   }
   return aggregate;
 }
@@ -202,6 +252,14 @@ export function parseClientPayload(c: UnifiClientPayload): ParsedSample | null {
     rxPackets: intOrNull(c.rx_packets),
     rxDropped: null,
     rxErrors: null,
+    wifiTxAttempts: null,
+    wifiTxDropped: null,
+    rxCrypts: null,
+    macFilterRejections: null,
+    numRoamEvents: null,
+    cpuPct: null,
+    memPct: null,
+    uptimeSec: null,
   };
 }
 
@@ -239,15 +297,37 @@ export function normalizeRadio(r: UnifiRadioStats): Radio | null {
 }
 
 function intOrNull(value: unknown): number | null {
-  if (typeof value !== 'number') return null;
-  if (!Number.isFinite(value)) return null;
-  if (value < 0) return null;
+  // Aceita number direto OU string numérica (alguns campos do UniFi vêm
+  // como string em `system-stats`, ex: "17.7").
+  let n: number | null = null;
+  if (typeof value === 'number') n = value;
+  else if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) n = parsed;
+  }
+  if (n === null) return null;
+  if (!Number.isFinite(n)) return null;
+  if (n < 0) return null;
   // Counter UniFi pode crescer indefinidamente; acima de MAX_SAFE_INTEGER
   // perdemos precisão e gerariam deltas absurdos. Sentinela mais segura é
   // tratar como `null` (counter reset detectado em rebobinada via lógica
   // existente em metrics-write).
-  if (value > Number.MAX_SAFE_INTEGER) return null;
-  return Math.trunc(value);
+  if (n > Number.MAX_SAFE_INTEGER) return null;
+  return Math.trunc(n);
+}
+
+/** Variante para gauges (CPU/mem em %). Aceita string e preserva fração. */
+function floatOrNull(value: unknown): number | null {
+  let n: number | null = null;
+  if (typeof value === 'number') n = value;
+  else if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) n = parsed;
+  }
+  if (n === null) return null;
+  if (!Number.isFinite(n)) return null;
+  if (n < 0) return null;
+  return n;
 }
 
 function pickString(value: unknown): string | null {

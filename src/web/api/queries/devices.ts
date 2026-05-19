@@ -12,6 +12,9 @@ export interface Device {
   type: string;
   firstSeen: number;
   lastSeen: number | null;
+  version: string | null;
+  serial: string | null;
+  state: number | null;
 }
 
 export interface DeviceListParams {

@@ -4,6 +4,45 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — captura abrangente do payload UniFi (auditoria 100%)
+
+Após inspeção sistemática do payload bruto (`temp/metricas.txt`), 13 colunas
+novas em metrics + 3 em devices passam a capturar tudo que aparece na
+console UniFi (e mais). Migration `0003_glossy_brood.sql`.
+
+**Saúde do AP (gauges):**
+- `cpu_pct`, `mem_pct`, `uptime_sec` no Dashboard "Resumo por AP".
+- Permitem detectar APs sobrecarregados, leak de memória e reboots
+  inesperados — antes ficava cego para esses problemas.
+
+**Retry rate "real":**
+- `wifi_tx_attempts` capturado e usado como denominador do `retry_rate`
+  (era proxy retries/packets, agora é retries/attempts — métrica oficial
+  do firmware UniFi). Fallback para tx_packets quando attempts não vier.
+
+**Diagnóstico Wi-Fi:**
+- `rx_crypts` (decryption failures WPA), `wifi_tx_dropped` (drops
+  específicos do Wi-Fi), `mac_filter_rejections` (tentativas bloqueadas),
+  `num_roam_events` (eventos de roaming entre APs).
+- Disponíveis no CSV/ZIP de exportação (não no Dashboard pra não inflar
+  a tabela).
+
+**Inventário em devices:**
+- `version` (firmware), `serial`, `state` (online/offline) — cross-reference
+  em bugs de firmware e RMA.
+
+**Parser:**
+- `intOrNull` agora aceita strings numéricas (alguns campos do `system-stats`
+  vêm como string).
+- Novo helper `floatOrNull` para gauges (CPU/mem em %).
+
+**Frontend:**
+- 3 colunas novas no "Resumo por AP": CPU %, Mem %, Uptime.
+- Helpers `formatPercent` (gauges 0-100) e `formatUptime` (segundos →
+  "1d 04h"/"45min"/etc).
+
+3 testes novos cobrem CPU/mem/uptime, diag fields e inventory (143 total).
+
 ### Added — captura completa de métricas RX
 - Novas colunas `rx_bytes`, `rx_packets`, `rx_dropped`, `rx_errors` + deltas
   `d_rx_*` em `metrics_5m`/`1h`/`1d` (migration `0002_amusing_solo.sql`).

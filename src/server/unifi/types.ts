@@ -35,6 +35,10 @@ export interface UnifiDevicePayload {
   type: string;
   site_id?: string;
   uptime?: number;
+  // Inventário (campos não-cumulativos)
+  version?: string;
+  serial?: string;
+  state?: number;
   tx_bytes?: number;
   rx_bytes?: number;
   tx_packets?: number;
@@ -46,6 +50,12 @@ export interface UnifiDevicePayload {
   'user-num_sta'?: number;
   'guest-num_sta'?: number;
   radio_table_stats?: UnifiRadioStats[];
+  /** Snapshot de CPU/mem do AP — gauges, não cumulativos. */
+  'system-stats'?: {
+    cpu?: number | string;
+    mem?: number | string;
+    uptime?: number | string;
+  };
   /**
    * Em controllers UniFi modernos, contadores agregados de tx/rx (incluindo
    * `tx_dropped`, `tx_errors`, `rx_*`) vivem dentro de `stat.ap.*`, não nos
@@ -71,6 +81,12 @@ export interface UnifiDeviceStat {
   rx_bytes?: number;
   rx_errors?: number;
   rx_dropped?: number;
+  // Contadores adicionais (cumulativos) capturados a partir do audit:
+  wifi_tx_attempts?: number;
+  wifi_tx_dropped?: number;
+  rx_crypts?: number;
+  mac_filter_rejections?: number;
+  num_wifi_roam_to_events?: number;
 }
 
 export interface UnifiRadioStats {
