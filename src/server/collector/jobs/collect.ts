@@ -134,22 +134,6 @@ async function collectSite(
     client.fetchClients(site.unifiName),
   ]);
 
-  // Debug temporário: quando DEBUG_DEVICE_PAYLOAD=1, loga o payload bruto do
-  // primeiro device de cada ciclo (uma vez por site). Útil pra descobrir
-  // quais campos `tx_dropped`/`rx_errors`/`wifi_*` o firmware específico expõe.
-  if (process.env.DEBUG_DEVICE_PAYLOAD === '1' && devicesPayload.length > 0) {
-    const first = devicesPayload[0] as unknown as Record<string, unknown>;
-    log.info(
-      {
-        site: site.unifiName,
-        deviceMac: first?.mac,
-        deviceKeys: Object.keys(first ?? {}).sort(),
-        rawPayload: first,
-      },
-      'raw device payload (DEBUG_DEVICE_PAYLOAD)',
-    );
-  }
-
   const parsedDevices = devicesPayload
     .map((d) => parseDevicePayload(d))
     .filter((r): r is NonNullable<typeof r> => r !== null);

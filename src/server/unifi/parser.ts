@@ -79,13 +79,15 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
     }
   }
 
-  // Alguns firmwares (visto em UniFi OS 9.x com APs Wave 1/2) NÃO expõem
-  // `tx_packets`/`tx_retries` no nível do device — só por rádio. Sem esse
-  // fallback, `d_tx_packets`/`d_tx_retries` no device-aggregate vivem NULL e
-  // o Dashboard (que agrega por device) mostra "0" em "Pkts TX" e "Retx".
-  // Somamos os rádios como segunda fonte; preferimos sempre o valor declarado
-  // pelo controller quando ele vem, evitando salto de counter ao trocar de
-  // fonte caso o firmware comece a expor o campo no futuro.
+  // Cascata de fontes para contadores agregados do device:
+  //   1. campos top-level do payload (firmwares antigos)
+  //   2. `stat.ap.*` (firmwares modernos: UniFi OS 9.x+ guarda quase tudo aí —
+  //      tx_dropped, tx_errors, rx_*)
+  //   3. soma dos rádios (último recurso para tx_packets/tx_retries)
+  //
+  // Preferimos sempre a fonte mais "explícita" disponível para evitar salto
+  // de counter quando o firmware muda.
+  const stat = d.stat?.ap;
   const radioTotals = sumRadioCounters(radioSamples);
 
   const deviceAggregate: ParsedSample = {
@@ -93,11 +95,13 @@ export function parseDevicePayload(d: UnifiDevicePayload): ParsedDeviceResult | 
     radio: null,
     clientMac: null,
     clientCount: intOrNull(d.num_sta),
-    txBytes: intOrNull(d.tx_bytes),
-    txPackets: intOrNull(d.tx_packets) ?? radioTotals.txPackets,
-    txDropped: intOrNull(d.tx_dropped),
-    txErrors: intOrNull(d.tx_errors),
-    txRetries: intOrNull(d.tx_retries) ?? radioTotals.txRetries,
+    txBytes: intOrNull(d.tx_bytes) ?? intOrNull(stat?.tx_bytes),
+    txPackets:
+      intOrNull(d.tx_packets) ?? intOrNull(stat?.tx_packets) ?? radioTotals.txPackets,
+    txDropped: intOrNull(d.tx_dropped) ?? intOrNull(stat?.tx_dropped),
+    txErrors: intOrNull(d.tx_errors) ?? intOrNull(stat?.tx_errors),
+    txRetries:
+      intOrNull(d.tx_retries) ?? intOrNull(stat?.tx_retries) ?? radioTotals.txRetries,
   };
 
   return { device, samples: [...radioSamples, deviceAggregate] };

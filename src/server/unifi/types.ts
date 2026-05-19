@@ -46,6 +46,31 @@ export interface UnifiDevicePayload {
   'user-num_sta'?: number;
   'guest-num_sta'?: number;
   radio_table_stats?: UnifiRadioStats[];
+  /**
+   * Em controllers UniFi modernos, contadores agregados de tx/rx (incluindo
+   * `tx_dropped`, `tx_errors`, `rx_*`) vivem dentro de `stat.ap.*`, não nos
+   * campos top-level. Lemos como segunda fonte quando o top-level vier vazio.
+   */
+  stat?: {
+    ap?: UnifiDeviceStat;
+  };
+}
+
+/**
+ * Subset do `stat.ap` que de fato consumimos. O objeto completo tem ~150
+ * chaves (per-AP-VAP, signal levels, mac_filter_rejections, mcast/bcast,
+ * etc.); aqui só listamos os contadores agregados que viram colunas no banco.
+ */
+export interface UnifiDeviceStat {
+  tx_packets?: number;
+  tx_bytes?: number;
+  tx_dropped?: number;
+  tx_errors?: number;
+  tx_retries?: number;
+  rx_packets?: number;
+  rx_bytes?: number;
+  rx_errors?: number;
+  rx_dropped?: number;
 }
 
 export interface UnifiRadioStats {

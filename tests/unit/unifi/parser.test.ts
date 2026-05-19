@@ -177,6 +177,50 @@ describe('parseDevicePayload — fixture realista', () => {
     expect(agg.txPackets).toBeNull();
     expect(agg.txRetries).toBeNull();
   });
+
+  it('lê tx_dropped/tx_errors de stat.ap quando top-level vem zerado', () => {
+    // Caso UniFi OS 9.x: top-level só tem tx_bytes; tudo mais está em stat.ap.
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      tx_bytes: 163141999,
+      stat: {
+        ap: {
+          tx_packets: 189841,
+          tx_dropped: 0,
+          tx_errors: 36615,
+          tx_retries: 134601,
+          rx_packets: 116556,
+          rx_bytes: 64761161,
+          rx_errors: 1312,
+          rx_dropped: 1312,
+        },
+      },
+      radio_table_stats: [{ radio: 'ng', tx_packets: 120485, tx_retries: 128988 }],
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    // top-level tx_bytes preferido
+    expect(agg.txBytes).toBe(163141999);
+    // stat.ap tem valor explícito → vence o fallback dos rádios
+    expect(agg.txPackets).toBe(189841);
+    expect(agg.txRetries).toBe(134601);
+    // novos campos antes irrecuperáveis
+    expect(agg.txDropped).toBe(0);
+    expect(agg.txErrors).toBe(36615);
+  });
+
+  it('top-level vence stat.ap quando ambos estão preenchidos', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      tx_errors: 999,
+      stat: { ap: { tx_errors: 100 } },
+    };
+    const r = parseDevicePayload(payload)!;
+    const agg = r.samples.find((s) => s.radio === null)!;
+    expect(agg.txErrors).toBe(999);
+  });
 });
 
 describe('computeSiteAggregate', () => {
