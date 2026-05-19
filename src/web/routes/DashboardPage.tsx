@@ -6,6 +6,7 @@ import { useTopTalkers } from '../api/queries/top-talkers.ts';
 import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeatmap.tsx';
 import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/TimeSeriesChart.tsx';
 import { Card } from '../components/ui/Card.tsx';
+import { deviceLabelWithMac } from '../lib/device-label.ts';
 import { formatBytes, formatNumber, formatRate, formatRelative } from '../lib/format.ts';
 
 type Window = '6h' | '24h' | '7d';
@@ -32,8 +33,7 @@ export function DashboardPage() {
   const aliasMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const d of devices.data ?? []) {
-      const label = d.displayAlias ?? d.name ?? null;
-      if (label) map.set(d.id, label);
+      map.set(d.id, deviceLabelWithMac(d));
     }
     return map;
   }, [devices.data]);
@@ -195,14 +195,7 @@ export function DashboardPage() {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {tableRows.map((r) => (
                   <tr key={r.deviceId}>
-                    <td className="px-3 py-2 text-xs">
-                      {r.label}
-                      {r.label !== r.deviceId && (
-                        <span className="ml-2 font-mono text-[10px] text-slate-400">
-                          {r.deviceId.slice(0, 8)}
-                        </span>
-                      )}
-                    </td>
+                    <td className="px-3 py-2 text-xs">{r.label}</td>
                     <td className="px-3 py-2">{r.samples}</td>
                     <td className="px-3 py-2">{formatNumber(r.maxClientCount)}</td>
                     <td className="px-3 py-2">{formatBytes(r.totalBytes)}</td>
@@ -244,7 +237,7 @@ function groupSeries(
     byDevice.get(r.deviceId)!.push({ ts: r.ts, value: r.dTxBytes });
   }
   return [...byDevice.entries()].map(([deviceId, data]) => ({
-    name: aliasMap.get(deviceId) ?? deviceId.slice(0, 10),
+    name: aliasMap.get(deviceId) ?? deviceId,
     data,
   }));
 }
@@ -296,7 +289,7 @@ function summarizeDevices(
     if (!cur) {
       cur = {
         deviceId: r.deviceId,
-        label: aliasMap.get(r.deviceId) ?? r.deviceId,
+        label: aliasMap.get(r.deviceId) ?? 'Antena desconhecida',
         samples: 0,
         maxClientCount: null,
         totalBytes: 0,

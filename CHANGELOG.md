@@ -4,6 +4,35 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added
+- **Exportação ZIP por nível** (`GET /api/v1/export/metrics.zip`). Devolve um
+  ZIP com até 4 CSVs separados — `por-site.csv`, `por-antena.csv`,
+  `por-radio.csv`, `por-cliente.csv` — cada um focado em sua granularidade,
+  sem misturar dimensões. Aceita `?levels=site,device,radio,client` (subset).
+- **Colunas legíveis nos CSVs**: agora cada CSV inclui `controller_name`,
+  `site_name`, `device_label`, `device_mac`, `device_name`, `device_alias`
+  (quando aplicável ao nível) — não é mais necessário cruzar ULIDs manualmente.
+- **Filtros amigáveis na tela de Relatórios**: dropdown de Site (substitui
+  campo livre de ULID), dropdown de Antena opcional (label "Nome (MAC)"),
+  e seletor de quais níveis exportar (chips Site/Antena/Rádio/Cliente).
+- Endpoint `GET /api/v1/export/metrics.csv?level=device` (singular) retorna
+  CSV puro de um único nível com as colunas legíveis. Múltiplos `levels`
+  no mesmo endpoint disparam fallback para ZIP automaticamente.
+
+### Changed
+- **PDF** agora resolve o nome de toda antena (`Nome (MAC)`) mesmo quando o
+  filtro `siteId` não é informado. Antes caía em ULID truncado.
+- **Dashboard "Resumo por AP"**: removido o sufixo de 8 chars do ULID; o
+  label agora é sempre `Nome (MAC)` (ou só `MAC` se a antena não tem
+  alias/nome conhecido). Mesmo formato passou a ser usado nas legendas dos
+  gráficos de série temporal.
+- Endpoint legado `GET /api/v1/export/metrics.csv` (sem `level`) mantém o
+  formato unificado antigo para retrocompat de scripts externos.
+
+### Documentation
+- README: nova seção sobre exportação em ZIP, filtros amigáveis e o
+  comportamento "Nome (MAC)" no Dashboard.
+
 ## [1.0.4] — 2026-05-18
 
 ### Changed

@@ -39,3 +39,7 @@ test-results/
 
 # Generated
 src/web/routeTree.gen.ts
+
+# Temp Files
+temp/
+temp/*

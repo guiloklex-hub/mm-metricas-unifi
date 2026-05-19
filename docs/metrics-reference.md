@@ -84,3 +84,23 @@ Dashboard e exportações escolhem a granularidade conforme o tamanho da janela:
 | > 60 dias | `metrics_1d` |
 
 Garante respostas < 1s na maioria dos painéis.
+
+## Exportação de relatórios
+
+| Endpoint | O quê |
+|---|---|
+| `GET /api/v1/export/metrics.csv` | CSV puro. Sem `?level` → formato unificado legado (mistura de granularidades, só ULIDs). Com `?level=site\|device\|radio\|client` → CSV daquela granularidade com colunas legíveis (`controller_name`, `site_name`, `device_label`, `device_mac`, `device_name`, `device_alias`). Múltiplos `?levels=...` no mesmo endpoint disparam fallback para ZIP. |
+| `GET /api/v1/export/metrics.zip` | ZIP com um CSV por nível (`por-site.csv`, `por-antena.csv`, `por-radio.csv`, `por-cliente.csv`). Default: todos os 4 níveis. Aceita `?levels=site,device` (subset). |
+| `POST /api/v1/reports/pdf` | Resumo executivo. Lista antenas com label `Nome (MAC)` mesmo sem filtro de site. Janela máxima de 90 dias. |
+
+Filtros comuns aceitos em `.csv`/`.zip`: `from`, `to` (epoch segundos), `granularity`, `controllerId`, `siteId`, `deviceId`, `radio`, `clientMac`.
+
+### Label de antena nos relatórios
+
+A coluna `device_label` (e a legenda do PDF e do Dashboard) segue esta ordem de preferência:
+
+1. `displayAlias` — apelido custom cadastrado pelo operador (em `/devices` ou via import CSV).
+2. `name` — nome reportado pelo controller UniFi (descoberto via coleta).
+3. `mac` — MAC normalizado (`lowercase`, separado por `:`).
+
+Nunca cai em ULID — se o operador não conhece o nome, vê pelo menos o MAC.

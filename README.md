@@ -14,7 +14,8 @@ Construído para resolver um problema concreto: a interface nova do UniFi Networ
 - Armazenamento local em SQLite (WAL) com downsampling: 5min × 30d → hourly × 1 ano → daily indefinido
 - **Backfill de histórico**: importa séries já existentes no controller (endpoint `stat/report`) — não é preciso esperar o sistema captar do zero
 - Dashboard BI com gráficos interativos (timeseries, heatmap, comparativos)
-- Exportação CSV (streaming) e PDF (relatório executivo)
+- Exportação CSV (streaming) e PDF (relatório executivo). Suporta ZIP com um CSV por nível (site / antena / rádio / cliente) — colunas legíveis com nome do controller, do site e label "Nome (MAC)" da antena
+- Cadastro de **apelidos** por antena (edição inline ou import em massa via CSV `mac,alias`)
 - Multi-localidade — cadastre quantos controllers quiser
 - Auth single-admin com argon2id, JWT em cookie httpOnly
 - Roda como container Docker único, sem dependências externas (sem Redis, sem Postgres)
