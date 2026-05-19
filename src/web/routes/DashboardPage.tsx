@@ -192,7 +192,8 @@ export function DashboardPage() {
                   <th className="px-3 py-2">Bytes Tx</th>
                   <th className="px-3 py-2">Bytes Rx</th>
                   <th className="px-3 py-2">Pkts Tx</th>
-                  <th className="px-3 py-2">Pkts Dropped</th>
+                  <th className="px-3 py-2">Drop (Tx)</th>
+                  <th className="px-3 py-2">Drop (Rx)</th>
                   <th className="px-3 py-2">Erros (Tx)</th>
                   <th className="px-3 py-2">Erros (Rx)</th>
                   <th className="px-3 py-2">Retx</th>
@@ -211,6 +212,7 @@ export function DashboardPage() {
                     <td className="px-3 py-2">{formatBytes(r.totalRxBytes)}</td>
                     <td className="px-3 py-2">{formatNumber(r.totalPackets)}</td>
                     <td className="px-3 py-2">{formatNumber(r.totalDropped)}</td>
+                    <td className="px-3 py-2">{formatNumber(r.totalRxDropped)}</td>
                     <td className="px-3 py-2">{formatNumber(r.totalErrors)}</td>
                     <td className="px-3 py-2">{formatNumber(r.totalRxErrors)}</td>
                     <td className="px-3 py-2">{formatNumber(r.totalRetries)}</td>
@@ -264,6 +266,7 @@ interface DeviceRowSummary {
   totalErrors: number;
   totalRetries: number;
   totalRxBytes: number;
+  totalRxDropped: number;
   totalRxErrors: number;
   avgRetryRate: number | null;
   avgErrorRate: number | null;
@@ -280,6 +283,7 @@ function summarizeDevices(
     dTxErrors: number | null;
     dTxRetries: number | null;
     dRxBytes: number | null;
+    dRxDropped: number | null;
     dRxErrors: number | null;
     retryRate: number | null;
     errorRate: number | null;
@@ -313,6 +317,7 @@ function summarizeDevices(
         totalErrors: 0,
         totalRetries: 0,
         totalRxBytes: 0,
+        totalRxDropped: 0,
         totalRxErrors: 0,
         avgRetryRate: null,
         avgErrorRate: null,
@@ -333,6 +338,7 @@ function summarizeDevices(
     cur.totalErrors += r.dTxErrors ?? 0;
     cur.totalRetries += r.dTxRetries ?? 0;
     cur.totalRxBytes += r.dRxBytes ?? 0;
+    cur.totalRxDropped += r.dRxDropped ?? 0;
     cur.totalRxErrors += r.dRxErrors ?? 0;
     if (r.clientCount != null) {
       cur.maxClientCount =
@@ -364,6 +370,7 @@ function summarizeDevices(
       totalErrors: v.totalErrors,
       totalRetries: v.totalRetries,
       totalRxBytes: v.totalRxBytes,
+      totalRxDropped: v.totalRxDropped,
       totalRxErrors: v.totalRxErrors,
       avgRetryRate: v._retryN ? v._retrySum / v._retryN : null,
       avgErrorRate: v._errN ? v._errSum / v._errN : null,
