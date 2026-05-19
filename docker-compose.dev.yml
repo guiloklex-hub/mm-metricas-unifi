@@ -4,11 +4,11 @@ services:
     container_name: metricas-unifi-dev
     restart: 'no'
     ports:
-      - '3000:3000'
+      - '3001:3001'
     environment:
       NODE_ENV: development
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: 3001
       DATABASE_PATH: /app/data/app.db
       LOG_LEVEL: debug
       MASTER_KEY: ${MASTER_KEY}

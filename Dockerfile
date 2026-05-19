@@ -34,7 +34,7 @@ LABEL org.opencontainers.image.source="https://github.com/guiloklex-hub/metricas
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000 \
+    PORT=3001 \
     DATABASE_PATH=/app/data/app.db
 
 WORKDIR /app
@@ -52,7 +52,7 @@ COPY --from=builder --chown=app:app /app/package.json ./package.json
 
 USER app
 
-EXPOSE 3000
+EXPOSE 3001
 VOLUME ["/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
