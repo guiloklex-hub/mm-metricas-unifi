@@ -4,6 +4,37 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Fixed — bugs visuais e dados desatualizados no PDF
+- **Sobreposição de linhas no PDF** corrigida: cada linha da tabela "Por AP"
+  agora calcula altura real via `doc.heightOfString`, então labels longos
+  (`BUBA-AP-GALPAO FRENTE ADM 01 (f4:92:bf:...)`) podem quebrar em 2-3
+  linhas sem sobrescrever a linha seguinte.
+- **Overflow horizontal** corrigido: PDF passou a usar A4 landscape (762pt
+  útil) — antes tentava encaixar 540pt em 515pt portrait, cortando coluna.
+
+### Added — métricas completas no PDF
+- Tabela "Por AP" do PDF agora tem 14 colunas: AP, Amostras, Bytes Tx,
+  Bytes Rx, Pacotes, Drop Tx, Drop Rx, Erro Tx, Erro Rx, Retx %, Erro %,
+  CPU, Mem, Uptime. Antes tinha só TX.
+- Bloco "Totais do período" tem totais Rx (bytes, pacotes, dropped, erros)
+  em 2 colunas pra economizar espaço vertical.
+- Sort dos APs no PDF passou a usar `totalBytes + totalRxBytes` em vez de
+  só TX — top do relatório reflete o tráfego real.
+- Header da tabela **repete automaticamente** quando paginates.
+- Zebra striping nas linhas (cinza muito claro alternado) — mais legível.
+
+### Improved — CSV
+- **BOM UTF-8** prefixado em todos os CSVs (legado, por-nível e dentro do
+  ZIP). Excel passa a abrir corretamente sem quebrar acentos.
+- **Filenames dentro do ZIP** agora incluem o período:
+  `por-antena_2026-04-19_2026-05-19.csv` em vez de só `por-antena.csv`.
+  Quem desempacota mantém contexto temporal mesmo se mover os arquivos.
+
+### Improved — ReportsPage
+- Mostra a **granularidade** que será usada antes do download
+  (`5m`/`1h`/`1d`) ao lado do "Janela: X dias". Usuário sabe se vai puxar
+  dados 5min ou hora antes de gerar.
+
 ### Added — captura abrangente do payload UniFi (auditoria 100%)
 
 Após inspeção sistemática do payload bruto (`temp/metricas.txt`), 13 colunas

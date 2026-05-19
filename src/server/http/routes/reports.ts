@@ -34,6 +34,13 @@ const LEVEL_TO_GROUP_BY: Record<CsvLevel, 'site' | 'device' | 'radio' | 'client'
   client: 'client',
 };
 
+/**
+ * UTF-8 BOM (Byte Order Mark). Sem isso, Excel abre CSV com encoding errado
+ * e quebra acentos (`Recepção` → `RecepÃ§Ã£o`). LibreOffice/Sheets já
+ * detectam UTF-8 sozinhos, mas Excel é o caso comum no usuário final.
+ */
+const UTF8_BOM = '﻿';
+
 /** Aceita ?level=device&level=radio ou ?levels=device,radio. */
 function parseLevels(query: Record<string, unknown>): CsvLevel[] {
   const raw: string[] = [];
@@ -103,6 +110,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       reply.raw.setHeader('content-type', 'text/csv; charset=utf-8');
       reply.raw.setHeader('content-disposition', `attachment; filename="${filename}"`);
       reply.raw.setHeader('cache-control', 'no-store');
+      reply.raw.write(UTF8_BOM);
       reply.raw.write(METRIC_CSV_HEADER);
       const { rows } = queryMetrics(db, { ...q, limit: 1_000_000 });
       for (const r of rows) reply.raw.write(metricRowToCsv(r));
@@ -128,6 +136,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
     reply.raw.setHeader('content-type', 'text/csv; charset=utf-8');
     reply.raw.setHeader('content-disposition', `attachment; filename="${filename}"`);
     reply.raw.setHeader('cache-control', 'no-store');
+    reply.raw.write(UTF8_BOM);
     reply.raw.write(CSV_HEADER_BY_LEVEL[level]);
     const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
     const { rows } = queryMetrics(db, {
@@ -186,12 +195,22 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       samples: number;
       totalBytes: number;
       totalPackets: number;
+      totalDropped: number;
+      totalErrors: number;
+      totalRxBytes: number;
+      totalRxDropped: number;
+      totalRxErrors: number;
+      lastUptimeSec: number | null;
       _retrySum: number;
       _retryN: number;
       _errSum: number;
       _errN: number;
       _dropSum: number;
       _dropN: number;
+      _cpuSum: number;
+      _cpuN: number;
+      _memSum: number;
+      _memN: number;
     };
     const agg = new Map<string, DeviceAgg>();
     const totals = {
@@ -200,6 +219,10 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       totalDropped: 0,
       totalErrors: 0,
       totalRetries: 0,
+      totalRxBytes: 0,
+      totalRxPackets: 0,
+      totalRxDropped: 0,
+      totalRxErrors: 0,
     };
     for (const r of rows) {
       if (!r.deviceId) continue;
@@ -212,18 +235,33 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
           samples: 0,
           totalBytes: 0,
           totalPackets: 0,
+          totalDropped: 0,
+          totalErrors: 0,
+          totalRxBytes: 0,
+          totalRxDropped: 0,
+          totalRxErrors: 0,
+          lastUptimeSec: null,
           _retrySum: 0,
           _retryN: 0,
           _errSum: 0,
           _errN: 0,
           _dropSum: 0,
           _dropN: 0,
+          _cpuSum: 0,
+          _cpuN: 0,
+          _memSum: 0,
+          _memN: 0,
         };
         agg.set(r.deviceId, cur);
       }
       cur.samples += 1;
       cur.totalBytes += r.dTxBytes ?? 0;
       cur.totalPackets += r.dTxPackets ?? 0;
+      cur.totalDropped += r.dTxDropped ?? 0;
+      cur.totalErrors += r.dTxErrors ?? 0;
+      cur.totalRxBytes += r.dRxBytes ?? 0;
+      cur.totalRxDropped += r.dRxDropped ?? 0;
+      cur.totalRxErrors += r.dRxErrors ?? 0;
       if (r.retryRate != null) {
         cur._retrySum += r.retryRate;
         cur._retryN += 1;
@@ -236,11 +274,27 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
         cur._dropSum += r.dropRate;
         cur._dropN += 1;
       }
+      if (r.cpuPct != null) {
+        cur._cpuSum += r.cpuPct;
+        cur._cpuN += 1;
+      }
+      if (r.memPct != null) {
+        cur._memSum += r.memPct;
+        cur._memN += 1;
+      }
+      if (r.uptimeSec != null) {
+        cur.lastUptimeSec =
+          cur.lastUptimeSec == null ? r.uptimeSec : Math.max(cur.lastUptimeSec, r.uptimeSec);
+      }
       totals.totalBytes += r.dTxBytes ?? 0;
       totals.totalPackets += r.dTxPackets ?? 0;
       totals.totalDropped += r.dTxDropped ?? 0;
       totals.totalErrors += r.dTxErrors ?? 0;
       totals.totalRetries += r.dTxRetries ?? 0;
+      totals.totalRxBytes += r.dRxBytes ?? 0;
+      totals.totalRxPackets += r.dRxPackets ?? 0;
+      totals.totalRxDropped += r.dRxDropped ?? 0;
+      totals.totalRxErrors += r.dRxErrors ?? 0;
     }
 
     const deviceSummary = [...agg.values()]
@@ -249,11 +303,19 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
         samples: d.samples,
         totalBytes: d.totalBytes,
         totalPackets: d.totalPackets,
+        totalDropped: d.totalDropped,
+        totalErrors: d.totalErrors,
+        totalRxBytes: d.totalRxBytes,
+        totalRxDropped: d.totalRxDropped,
+        totalRxErrors: d.totalRxErrors,
         avgRetryRate: d._retryN ? d._retrySum / d._retryN : null,
         avgErrorRate: d._errN ? d._errSum / d._errN : null,
         avgDropRate: d._dropN ? d._dropSum / d._dropN : null,
+        avgCpuPct: d._cpuN ? d._cpuSum / d._cpuN : null,
+        avgMemPct: d._memN ? d._memSum / d._memN : null,
+        lastUptimeSec: d.lastUptimeSec,
       }))
-      .sort((a, b) => b.totalBytes - a.totalBytes);
+      .sort((a, b) => b.totalBytes + b.totalRxBytes - (a.totalBytes + a.totalRxBytes));
 
     const fromIso = new Date(q.from * 1000).toISOString().slice(0, 10);
     const toIso = new Date(q.to * 1000).toISOString().slice(0, 10);
@@ -308,17 +370,24 @@ async function streamZip(
   const archive = new ZipArchive({ zlib: { level: 6 } });
   archive.pipe(reply.raw);
 
+  // Inclui período nos filenames internos pra que quem desempacotar o ZIP
+  // mantenha o contexto temporal sem depender só do nome do ZIP em si.
+  const fromIso = new Date(q.from * 1000).toISOString().slice(0, 10);
+  const toIso = new Date(q.to * 1000).toISOString().slice(0, 10);
+
   for (const level of levels) {
     const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
     const header = CSV_HEADER_BY_LEVEL[level];
-    const chunks: string[] = [header];
+    // BOM no início para Excel abrir UTF-8 sem quebrar acentos.
+    const chunks: string[] = [UTF8_BOM, header];
     const { rows } = queryMetrics(db, {
       ...q,
       groupBy: LEVEL_TO_GROUP_BY[level],
       limit: 1_000_000,
     });
     for (const r of rows) chunks.push(builder(r, labels));
-    archive.append(chunks.join(''), { name: CSV_FILENAME_BY_LEVEL[level] });
+    const base = CSV_FILENAME_BY_LEVEL[level].replace(/\.csv$/, '');
+    archive.append(chunks.join(''), { name: `${base}_${fromIso}_${toIso}.csv` });
   }
 
   await archive.finalize();

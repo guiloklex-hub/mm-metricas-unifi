@@ -61,6 +61,14 @@ export function ReportsPage() {
     return { from: now - PRESET_SECONDS[preset], to: now };
   }, [preset, fromCustom, toCustom]);
 
+  // Espelha src/server/utils/time.ts:chooseGranularity. Mantenha em sincronia.
+  const granularityHint = useMemo<'5m' | '1h' | '1d'>(() => {
+    const days = (to - from) / 86400;
+    if (days <= 2) return '5m';
+    if (days <= 60) return '1h';
+    return '1d';
+  }, [from, to]);
+
   function toggleLevel(level: Level): void {
     const next = new Set(levels);
     if (next.has(level)) next.delete(level);
@@ -278,7 +286,8 @@ export function ReportsPage() {
               Gerar PDF
             </Button>
             <span className="text-xs text-slate-500">
-              Janela: {Math.round((to - from) / 86400)} dias
+              Janela: {Math.round((to - from) / 86400)} dias · Granularidade:{' '}
+              <code className="font-mono">{granularityHint}</code>
             </span>
           </div>
         </div>
