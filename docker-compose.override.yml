@@ -5,3 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile
     pull_policy: never
+    environment:
+      # Liga o dump do payload bruto do stat/device quando .env tiver
+      # DEBUG_DEVICE_PAYLOAD=1. Sem essa propagação, o container não
+      # enxerga variáveis do .env do host fora das listadas no compose.
+      DEBUG_DEVICE_PAYLOAD: ${DEBUG_DEVICE_PAYLOAD:-0}
