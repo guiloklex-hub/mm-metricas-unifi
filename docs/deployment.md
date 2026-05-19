@@ -19,13 +19,13 @@ Volumes:
 
 Portas:
 
-- `3001` — API + Web UI.
+- `3000` — API + Web UI.
 
 ### Atrás de reverse proxy (Caddy)
 
 ```caddyfile
 metricas.empresa.com {
-    reverse_proxy localhost:3001
+    reverse_proxy localhost:3000
 }
 ```
 
@@ -41,7 +41,7 @@ server {
     ssl_certificate_key ...;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto https;
@@ -92,7 +92,7 @@ sudo journalctl -u metricas-unifi -f
 
 ## Primeiro acesso
 
-1. Acesse `http://<host>:3001`.
+1. Acesse `http://<host>:3000`.
 2. Setup wizard pede para definir senha do admin.
 3. Adicione o primeiro controller UniFi (URL, usuário, senha — ou API Key).
 4. Primeira coleta acontece em até 5 min; até lá, dashboard mostra estado "aguardando dados".
