@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMe, useSetupStatus } from './api/queries/auth.ts';
 import { AppShell, type Route } from './components/layout/AppShell.tsx';
+import { ClientsPage } from './routes/ClientsPage.tsx';
 import { ControllersPage } from './routes/ControllersPage.tsx';
 import { CoveragePage } from './routes/CoveragePage.tsx';
 import { DashboardPage } from './routes/DashboardPage.tsx';
@@ -37,6 +38,7 @@ export function App() {
   let content: React.ReactNode;
   if (route === 'controllers') content = <ControllersPage />;
   else if (route === 'devices') content = <DevicesPage />;
+  else if (route === 'clients') content = <ClientsPage />;
   else if (route === 'reports') content = <ReportsPage />;
   else if (route === 'settings') content = <SettingsPage />;
   else if (route === 'health') content = <HealthPage />;

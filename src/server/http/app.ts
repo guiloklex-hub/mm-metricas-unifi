@@ -11,6 +11,7 @@ import authPlugin from './plugins/auth.ts';
 import { registerErrorHandler } from './plugins/error-handler.ts';
 import { registerAuditRoutes } from './routes/audit.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
+import { registerClientRoutes } from './routes/clients.ts';
 import { registerControllerRoutes } from './routes/controllers.ts';
 import { registerDeviceRoutes } from './routes/devices.ts';
 import { registerEventsRoutes } from './routes/events.ts';
@@ -67,6 +68,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   });
   await registerSiteRoutes(app, opts.db);
   await registerDeviceRoutes(app, opts.db);
+  await registerClientRoutes(app, opts.db);
   await registerMetricsRoutes(app, opts.db);
   await registerReportRoutes(app, opts.db);
   await registerAuditRoutes(app, opts.db);

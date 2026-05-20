@@ -1,5 +1,6 @@
 import type { DB } from '@server/db/client.ts';
 import { markControllerError, markControllerSeen } from '@server/db/queries/controllers.ts';
+import { upsertClient } from '@server/db/queries/clients.ts';
 import { upsertDevice } from '@server/db/queries/devices.ts';
 import {
   type ClientSampleInput,
@@ -248,6 +249,19 @@ async function collectSite(
     if (parsed) {
       const deviceId = parsed.deviceMac ? (macToDeviceId.get(parsed.deviceMac) ?? null) : null;
       all.push(toMetricInput(parsed, controllerId, site.id, bucket, deviceId));
+      // Catálogo: registra hostname/name do controller. displayAlias custom
+      // é preservado por upsertClient em updates.
+      if (parsed.clientMac) {
+        upsertClient(db, {
+          controllerId,
+          siteId: site.id,
+          mac: parsed.clientMac,
+          hostname:
+            typeof c.hostname === 'string' && c.hostname.trim() ? c.hostname.trim() : null,
+          name: typeof c.name === 'string' && c.name.trim() ? c.name.trim() : null,
+          seenAt,
+        });
+      }
     }
     // Versão rica (signal/noise/rate) — só para clientes sem fio.
     const rich = parseClientMetric(c);

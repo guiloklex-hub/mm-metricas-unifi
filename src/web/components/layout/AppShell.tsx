@@ -9,6 +9,7 @@ export type Route =
   | 'events'
   | 'controllers'
   | 'devices'
+  | 'clients'
   | 'reports'
   | 'settings';
 
@@ -26,6 +27,7 @@ const TABS: Array<{ key: Route; label: string }> = [
   { key: 'events', label: 'Eventos' },
   { key: 'controllers', label: 'Controllers' },
   { key: 'devices', label: 'Antenas' },
+  { key: 'clients', label: 'Clientes' },
   { key: 'reports', label: 'Relatórios' },
   { key: 'settings', label: 'Configurações' },
 ];

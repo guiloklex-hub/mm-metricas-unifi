@@ -8,6 +8,7 @@ import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeat
 import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/TimeSeriesChart.tsx';
 import { Card } from '../components/ui/Card.tsx';
 import { QueryState } from '../components/ui/QueryState.tsx';
+import { clientLabelWithMac } from '../lib/client-label.ts';
 import { deviceLabelWithMac } from '../lib/device-label.ts';
 import {
   formatBytes,
@@ -165,21 +166,43 @@ export function DashboardPage() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-3 py-2">Cliente (MAC)</th>
+                  <th className="px-3 py-2">Cliente</th>
                   <th className="px-3 py-2">Bytes</th>
                   <th className="px-3 py-2">Pacotes</th>
                   <th className="px-3 py-2">Amostras</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                {topTalkers.data?.rows.map((t) => (
-                  <tr key={t.clientMac}>
-                    <td className="px-3 py-2 font-mono text-xs">{t.clientMac}</td>
-                    <td className="px-3 py-2">{formatBytes(t.totalBytes)}</td>
-                    <td className="px-3 py-2">{formatNumber(t.totalPackets)}</td>
-                    <td className="px-3 py-2">{t.samples}</td>
-                  </tr>
-                ))}
+                {topTalkers.data?.rows.map((t) => {
+                  const hasLabel = t.displayAlias || t.name || t.hostname;
+                  return (
+                    <tr key={t.clientMac}>
+                      <td className="px-3 py-2 text-sm">
+                        {hasLabel ? (
+                          <>
+                            <span>
+                              {clientLabelWithMac({
+                                displayAlias: t.displayAlias,
+                                name: t.name,
+                                hostname: t.hostname,
+                                mac: t.clientMac,
+                              })
+                                .replace(/ \([^)]+\)$/, '')}
+                            </span>
+                            <span className="ml-2 font-mono text-xs text-slate-500">
+                              {t.clientMac}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="font-mono text-xs">{t.clientMac}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">{formatBytes(t.totalBytes)}</td>
+                      <td className="px-3 py-2">{formatNumber(t.totalPackets)}</td>
+                      <td className="px-3 py-2">{t.samples}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -5,6 +5,12 @@ export interface TopTalker {
   clientMac: string;
   controllerId: string;
   siteId: string;
+  /** Hostname técnico do controller. Null se o cliente ainda não foi catalogado. */
+  hostname: string | null;
+  /** Apelido configurado no UniFi. */
+  name: string | null;
+  /** Apelido custom configurado em /clients (vence name). */
+  displayAlias: string | null;
   totalBytes: number;
   totalPackets: number;
   samples: number;

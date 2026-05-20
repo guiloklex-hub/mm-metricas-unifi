@@ -1,4 +1,5 @@
 import type { DB } from '@server/db/client.ts';
+import { listAllClients } from '@server/db/queries/clients.ts';
 import { listControllers } from '@server/db/queries/controllers.ts';
 import { listAllDevices } from '@server/db/queries/devices.ts';
 import { listAllSites } from '@server/db/queries/sites.ts';
@@ -11,10 +12,21 @@ export interface DeviceLabelEntry {
   alias: string | null;
 }
 
+export interface ClientLabelEntry {
+  label: string;
+  labelWithMac: string;
+  mac: string;
+  hostname: string | null;
+  name: string | null;
+  alias: string | null;
+}
+
 export interface LabelMaps {
   controllerName: Map<string, string>;
   siteName: Map<string, string>;
   device: Map<string, DeviceLabelEntry>;
+  /** Lookup por MAC do cliente (lowercase com `:`). */
+  clientByMac: Map<string, ClientLabelEntry>;
 }
 
 export interface BuildLabelMapsFilters {
@@ -47,6 +59,27 @@ export function deviceLabelWithMac(d: DeviceLikeBase): string {
   return main ? `${main} (${d.mac})` : d.mac;
 }
 
+interface ClientLikeBase {
+  mac: string;
+  hostname?: string | null;
+  name?: string | null;
+  displayAlias?: string | null;
+}
+
+/**
+ * Label de cliente. Ordem: displayAlias → name (UniFi) → hostname → MAC.
+ * Hostname é o fallback "técnico" (ex: `redmi-note-14`); name é o apelido
+ * configurado no UniFi (ex: `MM-NB-H3B9R44`).
+ */
+export function clientLabel(c: ClientLikeBase): string {
+  return c.displayAlias?.trim() || c.name?.trim() || c.hostname?.trim() || c.mac || '?';
+}
+
+export function clientLabelWithMac(c: ClientLikeBase): string {
+  const main = c.displayAlias?.trim() || c.name?.trim() || c.hostname?.trim();
+  return main ? `${main} (${c.mac})` : c.mac;
+}
+
 /**
  * Carrega os mapas de label de controllers, sites e devices de uma vez só.
  * Reutilizado por exportação CSV/ZIP e geração de PDF.
@@ -73,5 +106,17 @@ export function buildLabelMaps(db: DB, filters: BuildLabelMapsFilters = {}): Lab
     });
   }
 
-  return { controllerName, siteName, device };
+  const clientByMac = new Map<string, ClientLabelEntry>();
+  for (const c of listAllClients(db, filters)) {
+    clientByMac.set(c.mac, {
+      label: clientLabel(c),
+      labelWithMac: clientLabelWithMac(c),
+      mac: c.mac,
+      hostname: c.hostname,
+      name: c.name,
+      alias: c.displayAlias,
+    });
+  }
+
+  return { controllerName, siteName, device, clientByMac };
 }

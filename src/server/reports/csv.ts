@@ -219,6 +219,10 @@ export const CLIENT_CSV_HEADER = csvRow([
   'device_name',
   'device_alias',
   'client_mac',
+  'client_label',
+  'client_hostname',
+  'client_name',
+  'client_alias',
   ...COMMON_METRIC_COLS,
 ]);
 
@@ -332,6 +336,7 @@ export function radioRowToCsv(r: MetricRow, labels: LabelMaps): string {
 export function clientRowToCsv(r: MetricRow, labels: LabelMaps): string {
   const ctx = siteContext(r, labels);
   const dev = deviceContext(r, labels);
+  const client = r.clientMac ? labels.clientByMac.get(r.clientMac) : undefined;
   return csvRow([
     r.ts,
     isoUtc(r.ts),
@@ -345,6 +350,10 @@ export function clientRowToCsv(r: MetricRow, labels: LabelMaps): string {
     dev.name,
     dev.alias,
     r.clientMac ?? '',
+    client?.label ?? '',
+    client?.hostname ?? '',
+    client?.name ?? '',
+    client?.alias ?? '',
     ...commonMetricValues(r),
   ]);
 }

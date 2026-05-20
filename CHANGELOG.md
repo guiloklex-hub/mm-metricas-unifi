@@ -4,6 +4,26 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — nomes de clientes em todo o sistema
+- **Nova tabela `clients`** (migration 0006): cataloga MAC + hostname (técnico
+  do controller) + name (apelido do UniFi) + displayAlias (custom editável) +
+  firstSeen/lastSeen. Espelha `devices`.
+- **Coletor** chama `upsertClient` para cada cliente visto. displayAlias custom
+  é preservado em updates.
+- **Top Talkers** do Dashboard mostra `Nome (MAC)` em vez de só MAC. Cliente
+  sem catálogo continua aparecendo (LEFT JOIN), só sem labels.
+- **Nova tela `/clients`** com listagem (Controller · MAC · Hostname · Nome ·
+  Apelido · Última vez visto), edição inline de apelido e import CSV em
+  massa. Mesmo padrão visual da tela `/devices`.
+- **Endpoint** `/api/v1/clients` (GET listagem, PUT alias, POST import).
+- **CSV de cliente** ganha colunas `client_label`, `client_hostname`,
+  `client_name`, `client_alias` após `client_mac`.
+- **Sidebar** ganha link "Clientes" entre "Antenas" e "Relatórios".
+- Display priority: `displayAlias > name > hostname > mac` — apelido custom
+  vence o que vem do UniFi, que vence o hostname técnico.
+
+Tests: 148 → 149 (listTopTalkers com JOIN preserva clientes sem catálogo).
+
 ### Added — clientes e tráfego por SSID/banda
 - **3 tabelas novas**: `metrics_vap_5m`, `_1h`, `_1d` capturando 1 linha por
   combinação `(device × rádio × SSID)` (VAP/BSSID). Migration 0004 cuida

@@ -14,6 +14,8 @@ export type AuditAction =
   | 'controller.backfill.requested'
   | 'device.alias.updated'
   | 'device.aliases.imported'
+  | 'client.alias.updated'
+  | 'client.aliases.imported'
   | 'report.csv'
   | 'report.pdf';
 

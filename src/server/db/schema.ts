@@ -55,6 +55,33 @@ export const sites = sqliteTable(
   }),
 );
 
+export const clients = sqliteTable(
+  'clients',
+  {
+    id: text('id').primaryKey(),
+    controllerId: text('controller_id')
+      .notNull()
+      .references(() => controllers.id, { onDelete: 'cascade' }),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    mac: text('mac').notNull(),
+    /** Hostname técnico reportado pelo controller (ex: 'redmi-note-14'). */
+    hostname: text('hostname'),
+    /** Apelido configurado no próprio UniFi (ex: 'MM-NB-H3B9R44'). */
+    name: text('name'),
+    /** Apelido sobrescrito pelo operador no nosso sistema. Vence `name`. */
+    displayAlias: text('display_alias'),
+    firstSeen: integer('first_seen').notNull(),
+    lastSeen: integer('last_seen'),
+  },
+  (t) => ({
+    ctrlMacUnique: uniqueIndex('clients_controller_mac_unique').on(t.controllerId, t.mac),
+    siteIdx: index('clients_site_idx').on(t.siteId),
+    aliasIdx: index('clients_alias_idx').on(t.displayAlias),
+  }),
+);
+
 export const devices = sqliteTable(
   'devices',
   {
