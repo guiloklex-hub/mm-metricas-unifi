@@ -5,6 +5,7 @@ import {
   loginPath,
   selfSitesPath,
   statDevicePath,
+  statEventPath,
   statHealthPath,
   statReportPath,
   statStaPath,
@@ -15,6 +16,7 @@ import type {
   UnifiClientPayload,
   UnifiControllerConfig,
   UnifiDevicePayload,
+  UnifiEventPayload,
   UnifiSitePayload,
   UnifiStatReportPoint,
 } from './types.ts';
@@ -166,6 +168,20 @@ export class UnifiClient {
     const url = joinUrl(this.config.baseUrl, statHealthPath(this.variant, siteName));
     const body = await this.authedGet(url);
     return body.data;
+  }
+
+  /**
+   * Eventos recentes do controller. `limit` controla quantos pegamos do
+   * cursor mais recente (default 200 = ~horas de eventos numa rede normal).
+   * O endpoint não aceita filtro `since` no UniFi Network clássico — pegamos
+   * tudo e deixamos a dedup por `fingerprint` no parser/insert resolver.
+   */
+  async fetchEvents(siteName: string, limit = 200): Promise<UnifiEventPayload[]> {
+    await this.ensureReady();
+    const base = joinUrl(this.config.baseUrl, statEventPath(this.variant, siteName));
+    const url = `${base}?_sort=-time&_limit=${Math.max(1, Math.min(limit, 1000))}`;
+    const body = await this.authedGet(url);
+    return (body.data ?? []) as UnifiEventPayload[];
   }
 
   /**

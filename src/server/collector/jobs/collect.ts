@@ -2,9 +2,17 @@ import type { DB } from '@server/db/client.ts';
 import { markControllerError, markControllerSeen } from '@server/db/queries/controllers.ts';
 import { upsertDevice } from '@server/db/queries/devices.ts';
 import {
+  type ClientSampleInput,
+  type EventInput,
+  insertClientSamples5m,
+  insertEvents,
+  insertPortSamples5m,
+  insertRadioSamples5m,
   insertSamples5m,
   insertVapSamples5m,
   type MetricSampleInput,
+  type PortSampleInput,
+  type RadioSampleInput,
   type VapSampleInput,
 } from '@server/db/queries/metrics-write.ts';
 import { listEnabledSitesByController, upsertSite } from '@server/db/queries/sites.ts';
@@ -12,8 +20,10 @@ import type { UnifiClient } from '@server/unifi/client.ts';
 import {
   computeSiteAggregate,
   type ParsedSample,
+  parseClientMetric,
   parseClientPayload,
   parseDevicePayload,
+  parseEvent,
   parseVapTable,
 } from '@server/unifi/parser.ts';
 import { bucketTs, nowSeconds } from '@server/utils/time.ts';
@@ -100,7 +110,7 @@ export async function runCollectJob(
 
   for (const site of enabledSites) {
     try {
-      const { metrics, vap } = await collectSite(
+      const { metrics, vap, radios, ports, clients, events } = await collectSite(
         client,
         payload.controllerId,
         site,
@@ -110,14 +120,27 @@ export async function runCollectJob(
       );
       const metricsRes = insertSamples5m(db, metrics);
       const vapRes = insertVapSamples5m(db, vap);
+      const radioRes = insertRadioSamples5m(db, radios);
+      const portRes = insertPortSamples5m(db, ports);
+      const clientRes = insertClientSamples5m(db, clients);
+      const eventsRes = insertEvents(db, events);
       result.sitesPolled += 1;
-      result.samplesInserted += metricsRes.inserted + vapRes.inserted;
-      result.resetSignals += metricsRes.resetSignals + vapRes.resetSignals;
+      result.samplesInserted +=
+        metricsRes.inserted +
+        vapRes.inserted +
+        radioRes.inserted +
+        portRes.inserted +
+        clientRes.inserted;
+      result.resetSignals += metricsRes.resetSignals + vapRes.resetSignals + portRes.resetSignals;
       log.debug(
         {
           site: site.unifiName,
           metricsInserted: metricsRes.inserted,
           vapInserted: vapRes.inserted,
+          radioInserted: radioRes.inserted,
+          portInserted: portRes.inserted,
+          clientInserted: clientRes.inserted,
+          eventsInserted: eventsRes.inserted,
         },
         'site coletado',
       );
@@ -162,10 +185,22 @@ async function collectSite(
   bucket: number,
   db: DB,
   log: Logger,
-): Promise<{ metrics: MetricSampleInput[]; vap: VapSampleInput[] }> {
-  const [devicesPayload, clientsPayload] = await Promise.all([
+): Promise<{
+  metrics: MetricSampleInput[];
+  vap: VapSampleInput[];
+  radios: RadioSampleInput[];
+  ports: PortSampleInput[];
+  clients: ClientSampleInput[];
+  events: EventInput[];
+}> {
+  // Eventos vêm best-effort: se falhar não derruba a coleta principal.
+  const [devicesPayload, clientsPayload, eventsPayload] = await Promise.all([
     client.fetchDevices(site.unifiName),
     client.fetchClients(site.unifiName),
+    client.fetchEvents(site.unifiName, 200).catch((err) => {
+      log.warn({ err: errMsg(err), site: site.unifiName }, 'fetchEvents falhou');
+      return [] as Awaited<ReturnType<UnifiClient['fetchEvents']>>;
+    }),
   ]);
 
   const parsedDevices = devicesPayload
@@ -206,23 +241,50 @@ async function collectSite(
   const siteAgg = computeSiteAggregate(deviceSamples);
   all.push(toMetricInput(siteAgg, controllerId, site.id, bucket, null));
 
-  // Clientes.
+  // Clientes (sample bytes/packets em metrics_5m + sample rico em metrics_client_5m).
+  const clientMetrics: ClientSampleInput[] = [];
   for (const c of clientsPayload) {
     const parsed = parseClientPayload(c);
-    if (!parsed) continue;
-    const deviceId = parsed.deviceMac ? (macToDeviceId.get(parsed.deviceMac) ?? null) : null;
-    all.push(toMetricInput(parsed, controllerId, site.id, bucket, deviceId));
+    if (parsed) {
+      const deviceId = parsed.deviceMac ? (macToDeviceId.get(parsed.deviceMac) ?? null) : null;
+      all.push(toMetricInput(parsed, controllerId, site.id, bucket, deviceId));
+    }
+    // Versão rica (signal/noise/rate) — só para clientes sem fio.
+    const rich = parseClientMetric(c);
+    if (rich) {
+      const apDeviceId = rich.apMac ? (macToDeviceId.get(rich.apMac) ?? null) : null;
+      clientMetrics.push({
+        ts: bucket,
+        controllerId,
+        siteId: site.id,
+        apDeviceId,
+        clientMac: rich.clientMac,
+        essid: rich.essid,
+        radio: rich.radio,
+        channel: rich.channel,
+        signal: rich.signal,
+        noise: rich.noise,
+        txRateKbps: rich.txRateKbps,
+        rxRateKbps: rich.rxRateKbps,
+        idleTime: rich.idleTime,
+        roamCount: rich.roamCount,
+        isGuest: rich.isGuest,
+        isWired: rich.isWired,
+        uptimeSec: rich.uptimeSec,
+        txBytes: rich.txBytes,
+        rxBytes: rich.rxBytes,
+        txRetries: rich.txRetries,
+        rxRetries: rich.rxRetries,
+      });
+    }
   }
 
-  // VAP (SSID × rádio): coleta paralela aos contadores principais. Mesmo
-  // bucket de timestamp; gravados em tabela separada `metrics_vap_5m`.
-  // parseVapTable normaliza o MAC do device para o formato canônico, então
-  // o lookup no macToDeviceId funciona consistente com parseDevicePayload.
+  // VAP (SSID × rádio).
   const vap: VapSampleInput[] = [];
   for (const raw of devicesPayload) {
     for (const v of parseVapTable(raw)) {
       const deviceId = macToDeviceId.get(v.deviceMac);
-      if (!deviceId) continue; // VAP de device que falhou no parseDevicePayload — pular
+      if (!deviceId) continue;
       vap.push({
         ts: bucket,
         controllerId,
@@ -235,9 +297,96 @@ async function collectSite(
         avgClientSignal: v.avgClientSignal,
         txBytes: v.txBytes,
         rxBytes: v.rxBytes,
+        txPackets: v.txPackets,
+        rxPackets: v.rxPackets,
+        txRetries: v.txRetries,
+        txDropped: v.txDropped,
+        rxDropped: v.rxDropped,
+        ccq: v.ccq,
+        satisfaction: v.satisfaction,
         macFilterRejections: v.macFilterRejections,
       });
     }
+  }
+
+  // Radio (channel/util/power) — vem do parseDevicePayload.
+  const radios: RadioSampleInput[] = [];
+  for (const r of parsedDevices) {
+    const deviceId = macToDeviceId.get(r.device.mac);
+    if (!deviceId) continue;
+    for (const rm of r.radios) {
+      radios.push({
+        ts: bucket,
+        controllerId,
+        siteId: site.id,
+        deviceId,
+        radio: rm.radio,
+        channel: rm.channel,
+        txPower: rm.txPower,
+        state: rm.state,
+        numSta: rm.numSta,
+        userNumSta: rm.userNumSta,
+        guestNumSta: rm.guestNumSta,
+        cuTotal: rm.cuTotal,
+        cuSelfTx: rm.cuSelfTx,
+        cuSelfRx: rm.cuSelfRx,
+        satisfaction: rm.satisfaction,
+      });
+    }
+  }
+
+  // Portas (switches).
+  const ports: PortSampleInput[] = [];
+  for (const r of parsedDevices) {
+    const deviceId = macToDeviceId.get(r.device.mac);
+    if (!deviceId) continue;
+    for (const p of r.ports) {
+      ports.push({
+        ts: bucket,
+        controllerId,
+        siteId: site.id,
+        deviceId,
+        portIdx: p.portIdx,
+        name: p.name,
+        enable: p.enable,
+        up: p.up,
+        speed: p.speed,
+        fullDuplex: p.fullDuplex,
+        poeEnable: p.poeEnable,
+        poePower: p.poePower,
+        poeVoltage: p.poeVoltage,
+        txBytes: p.txBytes,
+        rxBytes: p.rxBytes,
+        txPackets: p.txPackets,
+        rxPackets: p.rxPackets,
+        txErrors: p.txErrors,
+        rxErrors: p.rxErrors,
+        txDropped: p.txDropped,
+        rxDropped: p.rxDropped,
+      });
+    }
+  }
+
+  // Eventos — parser dedup via fingerprint; resolve deviceId pelo deviceMac.
+  const events: EventInput[] = [];
+  for (const raw of eventsPayload) {
+    const parsed = parseEvent(raw);
+    if (!parsed) continue;
+    const deviceId = parsed.deviceMac ? (macToDeviceId.get(parsed.deviceMac) ?? null) : null;
+    events.push({
+      ts: parsed.ts,
+      controllerId,
+      siteId: site.id,
+      fingerprint: parsed.fingerprint,
+      eventType: parsed.eventType,
+      severity: parsed.severity,
+      message: parsed.message,
+      deviceMac: parsed.deviceMac,
+      deviceId,
+      clientMac: parsed.clientMac,
+      ssid: parsed.ssid,
+      payloadJson: JSON.stringify(parsed.raw),
+    });
   }
 
   log.debug(
@@ -245,11 +394,15 @@ async function collectSite(
       devices: parsedDevices.length,
       clients: clientsPayload.length,
       vapSamples: vap.length,
+      radioSamples: radios.length,
+      portSamples: ports.length,
+      clientMetrics: clientMetrics.length,
+      events: events.length,
       samples: all.length,
     },
     'coletado',
   );
-  return { metrics: all, vap };
+  return { metrics: all, vap, radios, ports, clients: clientMetrics, events };
 }
 
 function toMetricInput(
@@ -284,6 +437,8 @@ function toMetricInput(
     cpuPct: sample.cpuPct,
     memPct: sample.memPct,
     uptimeSec: sample.uptimeSec,
+    tempCpu: sample.tempCpu,
+    tempBoard: sample.tempBoard,
   };
 }
 

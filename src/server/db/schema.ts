@@ -135,6 +135,10 @@ const metricsColumns = {
   cpuPct: real('cpu_pct'),
   memPct: real('mem_pct'),
   uptimeSec: integer('uptime_sec'),
+  /** Temperatura da CPU/SoC do device, °C. Somente APs/switches que expõem. */
+  tempCpu: real('temp_cpu'),
+  /** Temperatura do board/PHY, °C. */
+  tempBoard: real('temp_board'),
   retryRate: real('retry_rate'),
   errorRate: real('error_rate'),
   dropRate: real('drop_rate'),
@@ -264,10 +268,23 @@ const vapMetricsColumns = {
   /** Counters cumulativos. */
   txBytes: integer('tx_bytes'),
   rxBytes: integer('rx_bytes'),
+  txPackets: integer('tx_packets'),
+  rxPackets: integer('rx_packets'),
+  txRetries: integer('tx_retries'),
+  txDropped: integer('tx_dropped'),
+  rxDropped: integer('rx_dropped'),
   macFilterRejections: integer('mac_filter_rejections'),
+  /** Métricas de qualidade nativas do UniFi (0-100). */
+  ccq: real('ccq'),
+  satisfaction: real('satisfaction'),
   /** Deltas calculados via counter_state. */
   dTxBytes: integer('d_tx_bytes'),
   dRxBytes: integer('d_rx_bytes'),
+  dTxPackets: integer('d_tx_packets'),
+  dRxPackets: integer('d_rx_packets'),
+  dTxRetries: integer('d_tx_retries'),
+  dTxDropped: integer('d_tx_dropped'),
+  dRxDropped: integer('d_rx_dropped'),
   dMacFilterRejections: integer('d_mac_filter_rejections'),
 };
 
@@ -312,6 +329,220 @@ export const metricsVap1d = sqliteTable('metrics_vap_1d', vapMetricsColumns, (t)
   ssidTs: index('metrics_vap_1d_ssid_ts').on(t.ssid, t.ts),
   controllerTs: index('metrics_vap_1d_controller_ts').on(t.controllerId, t.ts),
 }));
+
+/* ---------- Séries temporais por rádio (canal, util, power) ---------- */
+
+const radioMetricsColumns = {
+  ts: integer('ts').notNull(),
+  controllerId: text('controller_id').notNull(),
+  siteId: text('site_id').notNull(),
+  deviceId: text('device_id').notNull(),
+  radio: text('radio').notNull(),
+  /** Snapshot (rollup = LAST do bucket). */
+  channel: integer('channel'),
+  txPower: integer('tx_power'),
+  state: text('state'),
+  /** Gauges (rollup = AVG). */
+  numSta: integer('num_sta'),
+  userNumSta: integer('user_num_sta'),
+  guestNumSta: integer('guest_num_sta'),
+  /** Utilização total do canal (0-100). Métrica-chave de congestionamento. */
+  cuTotal: real('cu_total'),
+  cuSelfTx: real('cu_self_tx'),
+  cuSelfRx: real('cu_self_rx'),
+  satisfaction: real('satisfaction'),
+};
+
+export const metricsRadio5m = sqliteTable('metrics_radio_5m', radioMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_radio_5m_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+  ),
+  deviceTs: index('metrics_radio_5m_device_ts').on(t.deviceId, t.ts),
+  controllerTs: index('metrics_radio_5m_controller_ts').on(t.controllerId, t.ts),
+}));
+
+export const metricsRadio1h = sqliteTable('metrics_radio_1h', radioMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_radio_1h_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+  ),
+  deviceTs: index('metrics_radio_1h_device_ts').on(t.deviceId, t.ts),
+  controllerTs: index('metrics_radio_1h_controller_ts').on(t.controllerId, t.ts),
+}));
+
+export const metricsRadio1d = sqliteTable('metrics_radio_1d', radioMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_radio_1d_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+  ),
+  deviceTs: index('metrics_radio_1d_device_ts').on(t.deviceId, t.ts),
+  controllerTs: index('metrics_radio_1d_controller_ts').on(t.controllerId, t.ts),
+}));
+
+/* ---------- Séries temporais por cliente WiFi (cobertura) ---------- */
+
+const clientMetricsColumns = {
+  ts: integer('ts').notNull(),
+  controllerId: text('controller_id').notNull(),
+  siteId: text('site_id').notNull(),
+  /** ID do AP do nosso catálogo (pode ser '' se cliente não está em AP conhecido). */
+  apDeviceId: text('ap_device_id').notNull().default(''),
+  clientMac: text('client_mac').notNull(),
+  essid: text('essid').notNull().default(''),
+  radio: text('radio').notNull().default(''),
+  /** Gauges — rollup = AVG. */
+  channel: integer('channel'),
+  signal: real('signal'),
+  noise: real('noise'),
+  txRateKbps: integer('tx_rate_kbps'),
+  rxRateKbps: integer('rx_rate_kbps'),
+  /** Snapshot — rollup = LAST/MAX. */
+  idleTime: integer('idle_time'),
+  roamCount: integer('roam_count'),
+  isGuest: integer('is_guest'),
+  isWired: integer('is_wired'),
+  uptimeSec: integer('uptime_sec'),
+  /** Counters (não viram delta aqui — cliente entra/sai do AP frequentemente). */
+  txBytes: integer('tx_bytes'),
+  rxBytes: integer('rx_bytes'),
+  txRetries: integer('tx_retries'),
+  rxRetries: integer('rx_retries'),
+};
+
+export const metricsClient5m = sqliteTable('metrics_client_5m', clientMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_client_5m_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.clientMac,
+  ),
+  apTs: index('metrics_client_5m_ap_ts').on(t.apDeviceId, t.ts),
+  controllerTs: index('metrics_client_5m_controller_ts').on(t.controllerId, t.ts),
+  clientTs: index('metrics_client_5m_client_ts').on(t.clientMac, t.ts),
+}));
+
+export const metricsClient1h = sqliteTable('metrics_client_1h', clientMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_client_1h_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.clientMac,
+  ),
+  controllerTs: index('metrics_client_1h_controller_ts').on(t.controllerId, t.ts),
+  clientTs: index('metrics_client_1h_client_ts').on(t.clientMac, t.ts),
+}));
+
+/* ---------- Séries temporais por porta de switch ---------- */
+
+const portMetricsColumns = {
+  ts: integer('ts').notNull(),
+  controllerId: text('controller_id').notNull(),
+  siteId: text('site_id').notNull(),
+  deviceId: text('device_id').notNull(),
+  portIdx: integer('port_idx').notNull(),
+  name: text('name'),
+  enable: integer('enable'),
+  up: integer('up'),
+  speed: integer('speed'),
+  fullDuplex: integer('full_duplex'),
+  poeEnable: integer('poe_enable'),
+  poePower: real('poe_power'),
+  poeVoltage: real('poe_voltage'),
+  /** Counters cumulativos. */
+  txBytes: integer('tx_bytes'),
+  rxBytes: integer('rx_bytes'),
+  txPackets: integer('tx_packets'),
+  rxPackets: integer('rx_packets'),
+  txErrors: integer('tx_errors'),
+  rxErrors: integer('rx_errors'),
+  txDropped: integer('tx_dropped'),
+  rxDropped: integer('rx_dropped'),
+  /** Deltas calculados via counter_state. */
+  dTxBytes: integer('d_tx_bytes'),
+  dRxBytes: integer('d_rx_bytes'),
+  dTxPackets: integer('d_tx_packets'),
+  dRxPackets: integer('d_rx_packets'),
+  dTxErrors: integer('d_tx_errors'),
+  dRxErrors: integer('d_rx_errors'),
+  dTxDropped: integer('d_tx_dropped'),
+  dRxDropped: integer('d_rx_dropped'),
+};
+
+export const metricsPort5m = sqliteTable('metrics_port_5m', portMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_port_5m_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.portIdx,
+  ),
+  deviceTs: index('metrics_port_5m_device_ts').on(t.deviceId, t.ts),
+  controllerTs: index('metrics_port_5m_controller_ts').on(t.controllerId, t.ts),
+}));
+
+export const metricsPort1h = sqliteTable('metrics_port_1h', portMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_port_1h_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.portIdx,
+  ),
+  deviceTs: index('metrics_port_1h_device_ts').on(t.deviceId, t.ts),
+  controllerTs: index('metrics_port_1h_controller_ts').on(t.controllerId, t.ts),
+}));
+
+export const metricsPort1d = sqliteTable('metrics_port_1d', portMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_port_1d_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.portIdx,
+  ),
+  deviceTs: index('metrics_port_1d_device_ts').on(t.deviceId, t.ts),
+  controllerTs: index('metrics_port_1d_controller_ts').on(t.controllerId, t.ts),
+}));
+
+/* ---------- Eventos UniFi ---------- */
+
+export const events = sqliteTable(
+  'events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    ts: integer('ts').notNull(),
+    controllerId: text('controller_id').notNull(),
+    siteId: text('site_id').notNull(),
+    /** Fingerprint para idempotência (UPSERT). */
+    fingerprint: text('fingerprint').notNull(),
+    eventType: text('event_type').notNull(),
+    severity: text('severity').notNull(),
+    message: text('message'),
+    deviceMac: text('device_mac'),
+    deviceId: text('device_id'),
+    clientMac: text('client_mac'),
+    ssid: text('ssid'),
+    payloadJson: text('payload_json'),
+  },
+  (t) => ({
+    fingerprintUnique: uniqueIndex('events_fingerprint_unique').on(t.controllerId, t.fingerprint),
+    tsIdx: index('events_ts_idx').on(t.ts),
+    severityTs: index('events_severity_ts').on(t.severity, t.ts),
+    deviceTs: index('events_device_ts').on(t.deviceId, t.ts),
+    typeTs: index('events_type_ts').on(t.eventType, t.ts),
+    controllerTs: index('events_controller_ts').on(t.controllerId, t.ts),
+  }),
+);
 
 /**
  * SQL extra rodado pelo client em todo startup (PRAGMAs idempotentes).

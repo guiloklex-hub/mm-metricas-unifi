@@ -3,6 +3,11 @@ import {
   type RollupResult,
   rollup1hTo1d,
   rollup5mTo1h,
+  rollupClient5mTo1h,
+  rollupPort1hTo1d,
+  rollupPort5mTo1h,
+  rollupRadio1hTo1d,
+  rollupRadio5mTo1h,
   rollupVap1hTo1d,
   rollupVap5mTo1h,
 } from '@server/db/queries/rollup.ts';
@@ -37,12 +42,18 @@ export async function runRollup1h(
   const toTs = currentHour; // exclusivo — só agrega horas fechadas
   const result = rollup5mTo1h(db, fromTs, toTs);
   const vapResult = rollupVap5mTo1h(db, fromTs, toTs);
+  const radioResult = rollupRadio5mTo1h(db, fromTs, toTs);
+  const portResult = rollupPort5mTo1h(db, fromTs, toTs);
+  const clientResult = rollupClient5mTo1h(db, fromTs, toTs);
   logger.info(
     {
       fromTs,
       toTs,
       bucketsAffected: result.bucketsAffected,
       vapBucketsAffected: vapResult.bucketsAffected,
+      radioBucketsAffected: radioResult.bucketsAffected,
+      portBucketsAffected: portResult.bucketsAffected,
+      clientBucketsAffected: clientResult.bucketsAffected,
     },
     'rollup_1h concluído',
   );
@@ -61,12 +72,16 @@ export async function runRollup1d(
   const toTs = currentDay; // exclusivo
   const result = rollup1hTo1d(db, fromTs, toTs);
   const vapResult = rollupVap1hTo1d(db, fromTs, toTs);
+  const radioResult = rollupRadio1hTo1d(db, fromTs, toTs);
+  const portResult = rollupPort1hTo1d(db, fromTs, toTs);
   logger.info(
     {
       fromTs,
       toTs,
       bucketsAffected: result.bucketsAffected,
       vapBucketsAffected: vapResult.bucketsAffected,
+      radioBucketsAffected: radioResult.bucketsAffected,
+      portBucketsAffected: portResult.bucketsAffected,
     },
     'rollup_1d concluído',
   );

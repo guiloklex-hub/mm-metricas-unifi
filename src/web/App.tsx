@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { useMe, useSetupStatus } from './api/queries/auth.ts';
 import { AppShell, type Route } from './components/layout/AppShell.tsx';
 import { ControllersPage } from './routes/ControllersPage.tsx';
+import { CoveragePage } from './routes/CoveragePage.tsx';
 import { DashboardPage } from './routes/DashboardPage.tsx';
 import { DevicesPage } from './routes/DevicesPage.tsx';
+import { EventsPage } from './routes/EventsPage.tsx';
+import { HealthPage } from './routes/HealthPage.tsx';
 import { LoginPage } from './routes/LoginPage.tsx';
 import { ReportsPage } from './routes/ReportsPage.tsx';
 import { SettingsPage } from './routes/SettingsPage.tsx';
 import { SetupPage } from './routes/SetupPage.tsx';
+import { SwitchesPage } from './routes/SwitchesPage.tsx';
 
 export function App() {
   const setupStatus = useSetupStatus();
@@ -35,6 +39,10 @@ export function App() {
   else if (route === 'devices') content = <DevicesPage />;
   else if (route === 'reports') content = <ReportsPage />;
   else if (route === 'settings') content = <SettingsPage />;
+  else if (route === 'health') content = <HealthPage />;
+  else if (route === 'coverage') content = <CoveragePage />;
+  else if (route === 'switches') content = <SwitchesPage />;
+  else if (route === 'events') content = <EventsPage />;
   else content = <DashboardPage />;
 
   return (

@@ -42,6 +42,8 @@ export interface MetricSampleInput {
   cpuPct: number | null;
   memPct: number | null;
   uptimeSec: number | null;
+  tempCpu: number | null;
+  tempBoard: number | null;
 }
 
 const METRIC_NAMES = [
@@ -124,6 +126,7 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
        d_wifi_tx_attempts, d_wifi_tx_dropped, d_rx_crypts,
        d_mac_filter_rejections, d_num_roam_events,
        cpu_pct, mem_pct, uptime_sec,
+       temp_cpu, temp_board,
        retry_rate, error_rate, drop_rate
      )
      VALUES (?, ?, ?, ?, ?, ?,
@@ -137,6 +140,7 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
              ?, ?, ?,
              ?, ?,
              ?, ?, ?,
+             ?, ?,
              ?, ?, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO UPDATE SET
        client_count = excluded.client_count,
@@ -171,6 +175,8 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
        cpu_pct = excluded.cpu_pct,
        mem_pct = excluded.mem_pct,
        uptime_sec = excluded.uptime_sec,
+       temp_cpu = excluded.temp_cpu,
+       temp_board = excluded.temp_board,
        retry_rate = excluded.retry_rate,
        error_rate = excluded.error_rate,
        drop_rate = excluded.drop_rate`,
@@ -281,6 +287,8 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
         s.cpuPct,
         s.memPct,
         s.uptimeSec,
+        s.tempCpu,
+        s.tempBoard,
         retryRate,
         errorRate,
         dropRate,
@@ -389,6 +397,7 @@ export function insertHistoricalSamples(
        d_wifi_tx_attempts, d_wifi_tx_dropped, d_rx_crypts,
        d_mac_filter_rejections, d_num_roam_events,
        cpu_pct, mem_pct, uptime_sec,
+       temp_cpu, temp_board,
        retry_rate, error_rate, drop_rate
      )
      VALUES (?, ?, ?, ?, '', '',
@@ -402,6 +411,7 @@ export function insertHistoricalSamples(
              NULL, NULL, NULL,
              NULL, NULL,
              NULL, NULL, NULL,
+             NULL, NULL,
              NULL, NULL, ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, client_mac) DO NOTHING`,
   );
@@ -447,10 +457,26 @@ export interface VapSampleInput {
   avgClientSignal: number | null;
   txBytes: number | null;
   rxBytes: number | null;
+  txPackets: number | null;
+  rxPackets: number | null;
+  txRetries: number | null;
+  txDropped: number | null;
+  rxDropped: number | null;
+  ccq: number | null;
+  satisfaction: number | null;
   macFilterRejections: number | null;
 }
 
-const VAP_METRIC_NAMES = ['vap:tx_bytes', 'vap:rx_bytes', 'vap:mac_filter_rejections'] as const;
+const VAP_METRIC_NAMES = [
+  'vap:tx_bytes',
+  'vap:rx_bytes',
+  'vap:tx_packets',
+  'vap:rx_packets',
+  'vap:tx_retries',
+  'vap:tx_dropped',
+  'vap:rx_dropped',
+  'vap:mac_filter_rejections',
+] as const;
 type VapMetricName = (typeof VAP_METRIC_NAMES)[number];
 
 function vapCounterValue(s: VapSampleInput, metric: VapMetricName): number | null {
@@ -459,6 +485,16 @@ function vapCounterValue(s: VapSampleInput, metric: VapMetricName): number | nul
       return s.txBytes;
     case 'vap:rx_bytes':
       return s.rxBytes;
+    case 'vap:tx_packets':
+      return s.txPackets;
+    case 'vap:rx_packets':
+      return s.rxPackets;
+    case 'vap:tx_retries':
+      return s.txRetries;
+    case 'vap:tx_dropped':
+      return s.txDropped;
+    case 'vap:rx_dropped':
+      return s.rxDropped;
     case 'vap:mac_filter_rejections':
       return s.macFilterRejections;
   }
@@ -483,18 +519,43 @@ export function insertVapSamples5m(db: DB, samples: VapSampleInput[]): InsertSam
     `INSERT INTO metrics_vap_5m (
        ts, controller_id, site_id, device_id, radio, ssid,
        num_sta, is_guest, avg_client_signal,
-       tx_bytes, rx_bytes, mac_filter_rejections,
-       d_tx_bytes, d_rx_bytes, d_mac_filter_rejections
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       tx_bytes, rx_bytes, tx_packets, rx_packets,
+       tx_retries, tx_dropped, rx_dropped,
+       ccq, satisfaction,
+       mac_filter_rejections,
+       d_tx_bytes, d_rx_bytes, d_tx_packets, d_rx_packets,
+       d_tx_retries, d_tx_dropped, d_rx_dropped,
+       d_mac_filter_rejections
+     ) VALUES (?, ?, ?, ?, ?, ?,
+               ?, ?, ?,
+               ?, ?, ?, ?,
+               ?, ?, ?,
+               ?, ?,
+               ?,
+               ?, ?, ?, ?,
+               ?, ?, ?,
+               ?)
      ON CONFLICT(ts, controller_id, site_id, device_id, radio, ssid) DO UPDATE SET
        num_sta = excluded.num_sta,
        is_guest = excluded.is_guest,
        avg_client_signal = excluded.avg_client_signal,
        tx_bytes = excluded.tx_bytes,
        rx_bytes = excluded.rx_bytes,
+       tx_packets = excluded.tx_packets,
+       rx_packets = excluded.rx_packets,
+       tx_retries = excluded.tx_retries,
+       tx_dropped = excluded.tx_dropped,
+       rx_dropped = excluded.rx_dropped,
+       ccq = excluded.ccq,
+       satisfaction = excluded.satisfaction,
        mac_filter_rejections = excluded.mac_filter_rejections,
        d_tx_bytes = excluded.d_tx_bytes,
        d_rx_bytes = excluded.d_rx_bytes,
+       d_tx_packets = excluded.d_tx_packets,
+       d_rx_packets = excluded.d_rx_packets,
+       d_tx_retries = excluded.d_tx_retries,
+       d_tx_dropped = excluded.d_tx_dropped,
+       d_rx_dropped = excluded.d_rx_dropped,
        d_mac_filter_rejections = excluded.d_mac_filter_rejections`,
   );
 
@@ -512,7 +573,13 @@ export function insertVapSamples5m(db: DB, samples: VapSampleInput[]): InsertSam
 
   const tx = sqlite.transaction((items: VapSampleInput[]) => {
     for (const s of items) {
-      const lastRows = selectLast.all(s.controllerId, s.siteId, s.deviceId, s.radio, s.ssid) as Array<{
+      const lastRows = selectLast.all(
+        s.controllerId,
+        s.siteId,
+        s.deviceId,
+        s.radio,
+        s.ssid,
+      ) as Array<{
         metric: VapMetricName;
         lastValue: number;
       }>;
@@ -521,6 +588,11 @@ export function insertVapSamples5m(db: DB, samples: VapSampleInput[]): InsertSam
 
       const dTxBytes = computeDelta(s.txBytes, last['vap:tx_bytes'] ?? null);
       const dRxBytes = computeDelta(s.rxBytes, last['vap:rx_bytes'] ?? null);
+      const dTxPackets = computeDelta(s.txPackets, last['vap:tx_packets'] ?? null);
+      const dRxPackets = computeDelta(s.rxPackets, last['vap:rx_packets'] ?? null);
+      const dTxRetries = computeDelta(s.txRetries, last['vap:tx_retries'] ?? null);
+      const dTxDropped = computeDelta(s.txDropped, last['vap:tx_dropped'] ?? null);
+      const dRxDropped = computeDelta(s.rxDropped, last['vap:rx_dropped'] ?? null);
       const dMacFilterRejections = computeDelta(
         s.macFilterRejections,
         last['vap:mac_filter_rejections'] ?? null,
@@ -548,9 +620,21 @@ export function insertVapSamples5m(db: DB, samples: VapSampleInput[]): InsertSam
         s.avgClientSignal,
         s.txBytes,
         s.rxBytes,
+        s.txPackets,
+        s.rxPackets,
+        s.txRetries,
+        s.txDropped,
+        s.rxDropped,
+        s.ccq,
+        s.satisfaction,
         s.macFilterRejections,
         dTxBytes,
         dRxBytes,
+        dTxPackets,
+        dRxPackets,
+        dTxRetries,
+        dTxDropped,
+        dRxDropped,
         dMacFilterRejections,
       );
       inserted += 1;
@@ -565,4 +649,400 @@ export function insertVapSamples5m(db: DB, samples: VapSampleInput[]): InsertSam
 
   tx(samples);
   return { inserted, resetSignals };
+}
+
+/* -------------------------- Radio (canal × util) -------------------------- */
+
+export interface RadioSampleInput {
+  ts: number;
+  controllerId: string;
+  siteId: string;
+  deviceId: string;
+  radio: 'ng' | 'na' | '6e';
+  channel: number | null;
+  txPower: number | null;
+  state: string | null;
+  numSta: number | null;
+  userNumSta: number | null;
+  guestNumSta: number | null;
+  cuTotal: number | null;
+  cuSelfTx: number | null;
+  cuSelfRx: number | null;
+  satisfaction: number | null;
+}
+
+export function insertRadioSamples5m(db: DB, samples: RadioSampleInput[]): InsertSamplesResult {
+  if (samples.length === 0) return { inserted: 0, resetSignals: 0 };
+  const upsert = db.$client.prepare(
+    `INSERT INTO metrics_radio_5m (
+       ts, controller_id, site_id, device_id, radio,
+       channel, tx_power, state,
+       num_sta, user_num_sta, guest_num_sta,
+       cu_total, cu_self_tx, cu_self_rx, satisfaction
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(ts, controller_id, site_id, device_id, radio) DO UPDATE SET
+       channel = excluded.channel,
+       tx_power = excluded.tx_power,
+       state = excluded.state,
+       num_sta = excluded.num_sta,
+       user_num_sta = excluded.user_num_sta,
+       guest_num_sta = excluded.guest_num_sta,
+       cu_total = excluded.cu_total,
+       cu_self_tx = excluded.cu_self_tx,
+       cu_self_rx = excluded.cu_self_rx,
+       satisfaction = excluded.satisfaction`,
+  );
+  const tx = db.$client.transaction((items: RadioSampleInput[]) => {
+    for (const s of items) {
+      upsert.run(
+        s.ts,
+        s.controllerId,
+        s.siteId,
+        s.deviceId,
+        s.radio,
+        s.channel,
+        s.txPower,
+        s.state,
+        s.numSta,
+        s.userNumSta,
+        s.guestNumSta,
+        s.cuTotal,
+        s.cuSelfTx,
+        s.cuSelfRx,
+        s.satisfaction,
+      );
+    }
+  });
+  tx(samples);
+  return { inserted: samples.length, resetSignals: 0 };
+}
+
+/* -------------------------- Client (cobertura) -------------------------- */
+
+export interface ClientSampleInput {
+  ts: number;
+  controllerId: string;
+  siteId: string;
+  apDeviceId: string | null;
+  clientMac: string;
+  essid: string | null;
+  radio: string | null;
+  channel: number | null;
+  signal: number | null;
+  noise: number | null;
+  txRateKbps: number | null;
+  rxRateKbps: number | null;
+  idleTime: number | null;
+  roamCount: number | null;
+  isGuest: boolean | null;
+  isWired: boolean | null;
+  uptimeSec: number | null;
+  txBytes: number | null;
+  rxBytes: number | null;
+  txRetries: number | null;
+  rxRetries: number | null;
+}
+
+export function insertClientSamples5m(db: DB, samples: ClientSampleInput[]): InsertSamplesResult {
+  if (samples.length === 0) return { inserted: 0, resetSignals: 0 };
+  const upsert = db.$client.prepare(
+    `INSERT INTO metrics_client_5m (
+       ts, controller_id, site_id, ap_device_id, client_mac, essid, radio,
+       channel, signal, noise, tx_rate_kbps, rx_rate_kbps,
+       idle_time, roam_count, is_guest, is_wired, uptime_sec,
+       tx_bytes, rx_bytes, tx_retries, rx_retries
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(ts, controller_id, site_id, client_mac) DO UPDATE SET
+       ap_device_id = excluded.ap_device_id,
+       essid = excluded.essid,
+       radio = excluded.radio,
+       channel = excluded.channel,
+       signal = excluded.signal,
+       noise = excluded.noise,
+       tx_rate_kbps = excluded.tx_rate_kbps,
+       rx_rate_kbps = excluded.rx_rate_kbps,
+       idle_time = excluded.idle_time,
+       roam_count = excluded.roam_count,
+       is_guest = excluded.is_guest,
+       is_wired = excluded.is_wired,
+       uptime_sec = excluded.uptime_sec,
+       tx_bytes = excluded.tx_bytes,
+       rx_bytes = excluded.rx_bytes,
+       tx_retries = excluded.tx_retries,
+       rx_retries = excluded.rx_retries`,
+  );
+  const tx = db.$client.transaction((items: ClientSampleInput[]) => {
+    for (const s of items) {
+      upsert.run(
+        s.ts,
+        s.controllerId,
+        s.siteId,
+        s.apDeviceId ?? '',
+        s.clientMac,
+        s.essid ?? '',
+        s.radio ?? '',
+        s.channel,
+        s.signal,
+        s.noise,
+        s.txRateKbps,
+        s.rxRateKbps,
+        s.idleTime,
+        s.roamCount,
+        s.isGuest == null ? null : s.isGuest ? 1 : 0,
+        s.isWired == null ? null : s.isWired ? 1 : 0,
+        s.uptimeSec,
+        s.txBytes,
+        s.rxBytes,
+        s.txRetries,
+        s.rxRetries,
+      );
+    }
+  });
+  tx(samples);
+  return { inserted: samples.length, resetSignals: 0 };
+}
+
+/* -------------------------- Port (switches) -------------------------- */
+
+export interface PortSampleInput {
+  ts: number;
+  controllerId: string;
+  siteId: string;
+  deviceId: string;
+  portIdx: number;
+  name: string | null;
+  enable: boolean | null;
+  up: boolean | null;
+  speed: number | null;
+  fullDuplex: boolean | null;
+  poeEnable: boolean | null;
+  poePower: number | null;
+  poeVoltage: number | null;
+  txBytes: number | null;
+  rxBytes: number | null;
+  txPackets: number | null;
+  rxPackets: number | null;
+  txErrors: number | null;
+  rxErrors: number | null;
+  txDropped: number | null;
+  rxDropped: number | null;
+}
+
+const PORT_METRIC_NAMES = [
+  'port:tx_bytes',
+  'port:rx_bytes',
+  'port:tx_packets',
+  'port:rx_packets',
+  'port:tx_errors',
+  'port:rx_errors',
+  'port:tx_dropped',
+  'port:rx_dropped',
+] as const;
+type PortMetricName = (typeof PORT_METRIC_NAMES)[number];
+
+function portCounterValue(s: PortSampleInput, m: PortMetricName): number | null {
+  switch (m) {
+    case 'port:tx_bytes':
+      return s.txBytes;
+    case 'port:rx_bytes':
+      return s.rxBytes;
+    case 'port:tx_packets':
+      return s.txPackets;
+    case 'port:rx_packets':
+      return s.rxPackets;
+    case 'port:tx_errors':
+      return s.txErrors;
+    case 'port:rx_errors':
+      return s.rxErrors;
+    case 'port:tx_dropped':
+      return s.txDropped;
+    case 'port:rx_dropped':
+      return s.rxDropped;
+  }
+}
+
+export function insertPortSamples5m(db: DB, samples: PortSampleInput[]): InsertSamplesResult {
+  if (samples.length === 0) return { inserted: 0, resetSignals: 0 };
+  const sqlite = db.$client;
+
+  // Reusa counter_state: chave por (controller/site/device/'', '', `port:${idx}`)
+  // — usamos a coluna `ssid` para guardar o port_idx (string). Funciona porque
+  // a chave primária de counter_state inclui ssid.
+  const selectLast = sqlite.prepare(
+    `SELECT metric, last_value AS lastValue FROM counter_state
+     WHERE controller_id = ? AND site_id = ? AND device_id = ? AND radio = '' AND client_mac = '' AND ssid = ?`,
+  );
+
+  const upsertPort = sqlite.prepare(
+    `INSERT INTO metrics_port_5m (
+       ts, controller_id, site_id, device_id, port_idx,
+       name, enable, up, speed, full_duplex,
+       poe_enable, poe_power, poe_voltage,
+       tx_bytes, rx_bytes, tx_packets, rx_packets,
+       tx_errors, rx_errors, tx_dropped, rx_dropped,
+       d_tx_bytes, d_rx_bytes, d_tx_packets, d_rx_packets,
+       d_tx_errors, d_rx_errors, d_tx_dropped, d_rx_dropped
+     ) VALUES (?, ?, ?, ?, ?,
+               ?, ?, ?, ?, ?,
+               ?, ?, ?,
+               ?, ?, ?, ?,
+               ?, ?, ?, ?,
+               ?, ?, ?, ?,
+               ?, ?, ?, ?)
+     ON CONFLICT(ts, controller_id, site_id, device_id, port_idx) DO UPDATE SET
+       name = excluded.name,
+       enable = excluded.enable,
+       up = excluded.up,
+       speed = excluded.speed,
+       full_duplex = excluded.full_duplex,
+       poe_enable = excluded.poe_enable,
+       poe_power = excluded.poe_power,
+       poe_voltage = excluded.poe_voltage,
+       tx_bytes = excluded.tx_bytes,
+       rx_bytes = excluded.rx_bytes,
+       tx_packets = excluded.tx_packets,
+       rx_packets = excluded.rx_packets,
+       tx_errors = excluded.tx_errors,
+       rx_errors = excluded.rx_errors,
+       tx_dropped = excluded.tx_dropped,
+       rx_dropped = excluded.rx_dropped,
+       d_tx_bytes = excluded.d_tx_bytes,
+       d_rx_bytes = excluded.d_rx_bytes,
+       d_tx_packets = excluded.d_tx_packets,
+       d_rx_packets = excluded.d_rx_packets,
+       d_tx_errors = excluded.d_tx_errors,
+       d_rx_errors = excluded.d_rx_errors,
+       d_tx_dropped = excluded.d_tx_dropped,
+       d_rx_dropped = excluded.d_rx_dropped`,
+  );
+
+  const upsertState = sqlite.prepare(
+    `INSERT INTO counter_state (
+       controller_id, site_id, device_id, radio, client_mac, ssid, metric, last_value, last_ts
+     ) VALUES (?, ?, ?, '', '', ?, ?, ?, ?)
+     ON CONFLICT(controller_id, site_id, device_id, radio, client_mac, ssid, metric) DO UPDATE SET
+       last_value = excluded.last_value,
+       last_ts = excluded.last_ts`,
+  );
+
+  let inserted = 0;
+  let resetSignals = 0;
+  const tx = sqlite.transaction((items: PortSampleInput[]) => {
+    for (const s of items) {
+      const portKey = `port:${s.portIdx}`;
+      const lastRows = selectLast.all(s.controllerId, s.siteId, s.deviceId, portKey) as Array<{
+        metric: PortMetricName;
+        lastValue: number;
+      }>;
+      const last: Partial<Record<PortMetricName, number>> = {};
+      for (const r of lastRows) last[r.metric] = r.lastValue;
+      const dTxBytes = computeDelta(s.txBytes, last['port:tx_bytes'] ?? null);
+      const dRxBytes = computeDelta(s.rxBytes, last['port:rx_bytes'] ?? null);
+      const dTxPackets = computeDelta(s.txPackets, last['port:tx_packets'] ?? null);
+      const dRxPackets = computeDelta(s.rxPackets, last['port:rx_packets'] ?? null);
+      const dTxErrors = computeDelta(s.txErrors, last['port:tx_errors'] ?? null);
+      const dRxErrors = computeDelta(s.rxErrors, last['port:rx_errors'] ?? null);
+      const dTxDropped = computeDelta(s.txDropped, last['port:tx_dropped'] ?? null);
+      const dRxDropped = computeDelta(s.rxDropped, last['port:rx_dropped'] ?? null);
+      for (const m of PORT_METRIC_NAMES) {
+        const cur = portCounterValue(s, m);
+        const prev = last[m];
+        if (cur != null && prev != null && cur < prev) {
+          resetSignals += 1;
+          break;
+        }
+      }
+      upsertPort.run(
+        s.ts,
+        s.controllerId,
+        s.siteId,
+        s.deviceId,
+        s.portIdx,
+        s.name,
+        s.enable == null ? null : s.enable ? 1 : 0,
+        s.up == null ? null : s.up ? 1 : 0,
+        s.speed,
+        s.fullDuplex == null ? null : s.fullDuplex ? 1 : 0,
+        s.poeEnable == null ? null : s.poeEnable ? 1 : 0,
+        s.poePower,
+        s.poeVoltage,
+        s.txBytes,
+        s.rxBytes,
+        s.txPackets,
+        s.rxPackets,
+        s.txErrors,
+        s.rxErrors,
+        s.txDropped,
+        s.rxDropped,
+        dTxBytes,
+        dRxBytes,
+        dTxPackets,
+        dRxPackets,
+        dTxErrors,
+        dRxErrors,
+        dTxDropped,
+        dRxDropped,
+      );
+      inserted += 1;
+      for (const m of PORT_METRIC_NAMES) {
+        const v = portCounterValue(s, m);
+        if (v == null) continue;
+        upsertState.run(s.controllerId, s.siteId, s.deviceId, portKey, m, v, s.ts);
+      }
+    }
+  });
+  tx(samples);
+  return { inserted, resetSignals };
+}
+
+/* -------------------------- Events -------------------------- */
+
+export interface EventInput {
+  ts: number;
+  controllerId: string;
+  siteId: string;
+  fingerprint: string;
+  eventType: string;
+  severity: 'info' | 'warning' | 'critical';
+  message: string | null;
+  deviceMac: string | null;
+  deviceId: string | null;
+  clientMac: string | null;
+  ssid: string | null;
+  payloadJson: string | null;
+}
+
+export function insertEvents(db: DB, events: EventInput[]): { inserted: number; skipped: number } {
+  if (events.length === 0) return { inserted: 0, skipped: 0 };
+  const insert = db.$client.prepare(
+    `INSERT INTO events (
+       ts, controller_id, site_id, fingerprint, event_type, severity,
+       message, device_mac, device_id, client_mac, ssid, payload_json
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(controller_id, fingerprint) DO NOTHING`,
+  );
+  let inserted = 0;
+  let skipped = 0;
+  const tx = db.$client.transaction((items: EventInput[]) => {
+    for (const e of items) {
+      const r = insert.run(
+        e.ts,
+        e.controllerId,
+        e.siteId,
+        e.fingerprint,
+        e.eventType,
+        e.severity,
+        e.message,
+        e.deviceMac,
+        e.deviceId,
+        e.clientMac,
+        e.ssid,
+        e.payloadJson,
+      );
+      if (r.changes > 0) inserted += 1;
+      else skipped += 1;
+    }
+  });
+  tx(events);
+  return { inserted, skipped };
 }

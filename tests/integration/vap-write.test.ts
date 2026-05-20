@@ -3,8 +3,8 @@
  * a partir de counter_state com isolamento por ssid.
  */
 import type { DB } from '@server/db/client.ts';
-import { insertVapSamples5m } from '@server/db/queries/metrics-write.ts';
 import { queryVapMetrics } from '@server/db/queries/metrics-read.ts';
+import { insertVapSamples5m } from '@server/db/queries/metrics-write.ts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeTestDb, createTestDb } from './helpers/test-db.ts';
 
@@ -39,10 +39,7 @@ describe('insertVapSamples5m', () => {
   it('grava snapshot e calcula deltas por SSID isolados', () => {
     const ts = 1_735_689_600;
     // 1ª amostra: contadores cumulativos iniciais. d_tx_bytes = mesmo valor (sem last).
-    insertVapSamples5m(db, [
-      sample(ts, 'CORP', 1000, 500, 3),
-      sample(ts, 'GUEST', 0, 0, 0),
-    ]);
+    insertVapSamples5m(db, [sample(ts, 'CORP', 1000, 500, 3), sample(ts, 'GUEST', 0, 0, 0)]);
     // 2ª amostra: cresce. d_tx_bytes = diferença.
     insertVapSamples5m(db, [
       sample(ts + 300, 'CORP', 3000, 1500, 5),

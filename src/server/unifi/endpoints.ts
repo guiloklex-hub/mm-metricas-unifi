@@ -49,6 +49,15 @@ export function statReportPath(
   return `${apiPrefix(variant)}/s/${encodeURIComponent(site)}/stat/report/${interval}.${subject}`;
 }
 
+/**
+ * Eventos do controller (AP_Lost_Contact, EVT_AP_Connected, EVT_WU_Disconnected, etc).
+ * Uso típico: `?_sort=-time&_limit=200` para pegar os mais recentes. Sem filtro
+ * de tempo no endpoint clássico; alguns OS aceitam `within=N` (horas).
+ */
+export function statEventPath(variant: ControllerVariant | null, site: string): string {
+  return `${apiPrefix(variant)}/s/${encodeURIComponent(site)}/stat/event`;
+}
+
 /** Nova API oficial (apenas UniFi OS Network 9.3+). */
 export function integrationPath(suffix: string): string {
   return `/proxy/network/integration/v1${suffix.startsWith('/') ? suffix : `/${suffix}`}`;

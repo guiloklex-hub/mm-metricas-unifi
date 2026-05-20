@@ -284,22 +284,13 @@ export function DashboardPage() {
                   <th className="px-3 py-2">Retx %</th>
                   <th className="px-3 py-2">Erro %</th>
                   <th className="px-3 py-2">Drop %</th>
-                  <th
-                    className="px-3 py-2"
-                    title="CPU média do AP na janela (gauge)"
-                  >
+                  <th className="px-3 py-2" title="CPU média do AP na janela (gauge)">
                     CPU %
                   </th>
-                  <th
-                    className="px-3 py-2"
-                    title="Memória média do AP na janela (gauge)"
-                  >
+                  <th className="px-3 py-2" title="Memória média do AP na janela (gauge)">
                     Mem %
                   </th>
-                  <th
-                    className="px-3 py-2"
-                    title="Tempo desde o último boot do AP (segundos)"
-                  >
+                  <th className="px-3 py-2" title="Tempo desde o último boot do AP (segundos)">
                     Uptime
                   </th>
                 </tr>

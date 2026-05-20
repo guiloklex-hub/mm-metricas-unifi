@@ -54,13 +54,9 @@ describe('rate denominator', () => {
   it('usa wifi_tx_attempts como denominador quando disponível', () => {
     const ts = 1_735_689_600;
     // Primeira amostra: counter inicial (cumulativos). Não gera delta.
-    insertSamples5m(db, [
-      sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 }),
-    ]);
+    insertSamples5m(db, [sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 })]);
     // Segunda amostra: cresce. tx_errors > tx_packets (cenário real do UniFi).
-    insertSamples5m(db, [
-      sample(ts + 300, { txPackets: 100, txErrors: 50, wifiTxAttempts: 500 }),
-    ]);
+    insertSamples5m(db, [sample(ts + 300, { txPackets: 100, txErrors: 50, wifiTxAttempts: 500 })]);
 
     const row = db.$client
       .prepare(
@@ -85,12 +81,8 @@ describe('rate denominator', () => {
     const ts = 1_735_689_600;
     // Caso extremo: counter de errors avança mais que attempts (raro mas
     // possível em janelas onde wifi_tx_attempts atrasa).
-    insertSamples5m(db, [
-      sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 }),
-    ]);
-    insertSamples5m(db, [
-      sample(ts + 300, { txPackets: 100, txErrors: 200, wifiTxAttempts: 100 }),
-    ]);
+    insertSamples5m(db, [sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 })]);
+    insertSamples5m(db, [sample(ts + 300, { txPackets: 100, txErrors: 200, wifiTxAttempts: 100 })]);
 
     const row = db.$client
       .prepare(`SELECT error_rate FROM metrics_5m WHERE ts = ?`)

@@ -137,18 +137,8 @@ function drawTotals(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
   // Layout em 2 colunas (TX | RX) para caber melhor em landscape.
   const t = input.totals;
   const rows: Array<[string, string, string, string]> = [
-    [
-      'Bytes Tx',
-      formatBytes(t.totalBytes),
-      'Bytes Rx',
-      formatBytes(t.totalRxBytes),
-    ],
-    [
-      'Pacotes Tx',
-      formatNumber(t.totalPackets),
-      'Pacotes Rx',
-      formatNumber(t.totalRxPackets),
-    ],
+    ['Bytes Tx', formatBytes(t.totalBytes), 'Bytes Rx', formatBytes(t.totalRxBytes)],
+    ['Pacotes Tx', formatNumber(t.totalPackets), 'Pacotes Rx', formatNumber(t.totalRxPackets)],
     [
       'Descartados Tx',
       formatNumber(t.totalDropped),
@@ -163,12 +153,7 @@ function drawTotals(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
       'Taxa de erros',
       formatRate(safeRate(t.totalErrors, t.totalPackets)),
     ],
-    [
-      'Taxa de descarte',
-      formatRate(safeRate(t.totalDropped, t.totalPackets)),
-      '',
-      '',
-    ],
+    ['Taxa de descarte', formatRate(safeRate(t.totalDropped, t.totalPackets)), '', ''],
   ];
   const colW = 180;
   const valueW = 180;

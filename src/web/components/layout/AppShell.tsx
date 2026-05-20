@@ -1,7 +1,16 @@
 import { useLogout } from '../../api/queries/auth.ts';
 import { Button } from '../ui/Button.tsx';
 
-export type Route = 'dashboard' | 'controllers' | 'devices' | 'reports' | 'settings';
+export type Route =
+  | 'dashboard'
+  | 'health'
+  | 'coverage'
+  | 'switches'
+  | 'events'
+  | 'controllers'
+  | 'devices'
+  | 'reports'
+  | 'settings';
 
 export interface AppShellProps {
   current: Route;
@@ -11,6 +20,10 @@ export interface AppShellProps {
 
 const TABS: Array<{ key: Route; label: string }> = [
   { key: 'dashboard', label: 'Dashboard' },
+  { key: 'health', label: 'Saúde APs' },
+  { key: 'coverage', label: 'Cobertura' },
+  { key: 'switches', label: 'Switches' },
+  { key: 'events', label: 'Eventos' },
   { key: 'controllers', label: 'Controllers' },
   { key: 'devices', label: 'Antenas' },
   { key: 'reports', label: 'Relatórios' },

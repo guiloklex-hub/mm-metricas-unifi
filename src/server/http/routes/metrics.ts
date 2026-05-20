@@ -1,4 +1,9 @@
 import type { DB } from '@server/db/client.ts';
+import {
+  queryClientMetrics,
+  queryPortMetrics,
+  queryRadioMetrics,
+} from '@server/db/queries/metrics-extra-read.ts';
 import { queryMetrics, queryVapMetrics } from '@server/db/queries/metrics-read.ts';
 import { listTopTalkers } from '@server/db/queries/top-talkers.ts';
 import { metricsQuerySchema } from '@shared/schemas/metrics.ts';
@@ -147,5 +152,68 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
       siteId: q.siteId,
     });
     return { ok: true, data: { granularity, from, to, count: rows.length, rows } };
+  });
+
+  /* ------------------------ Radio (canal × util) ------------------------ */
+
+  const radioQuerySchema = z
+    .object({
+      from: z.coerce.number().int().positive(),
+      to: z.coerce.number().int().positive(),
+      granularity: z.enum(['5m', '1h', '1d']).optional(),
+      controllerId: z.string().min(1).max(64).optional(),
+      siteId: z.string().min(1).max(64).optional(),
+      deviceId: z.string().min(1).max(64).optional(),
+      radio: z.enum(['ng', 'na', '6e']).optional(),
+    })
+    .refine((v) => v.to > v.from, 'to deve ser maior que from')
+    .refine((v) => v.to - v.from <= 366 * 86400, 'janela máxima de 1 ano');
+
+  app.get('/api/v1/metrics/radio', { preHandler: app.requireAdmin() }, async (req) => {
+    const q = radioQuerySchema.parse(req.query);
+    const { rows, granularity } = queryRadioMetrics(db, q);
+    return { ok: true, data: { granularity, from: q.from, to: q.to, count: rows.length, rows } };
+  });
+
+  /* ------------------------ Port (switches) ------------------------ */
+
+  const portQuerySchema = z
+    .object({
+      from: z.coerce.number().int().positive(),
+      to: z.coerce.number().int().positive(),
+      granularity: z.enum(['5m', '1h', '1d']).optional(),
+      controllerId: z.string().min(1).max(64).optional(),
+      siteId: z.string().min(1).max(64).optional(),
+      deviceId: z.string().min(1).max(64).optional(),
+      portIdx: z.coerce.number().int().min(0).max(128).optional(),
+    })
+    .refine((v) => v.to > v.from, 'to deve ser maior que from')
+    .refine((v) => v.to - v.from <= 366 * 86400, 'janela máxima de 1 ano');
+
+  app.get('/api/v1/metrics/port', { preHandler: app.requireAdmin() }, async (req) => {
+    const q = portQuerySchema.parse(req.query);
+    const { rows, granularity } = queryPortMetrics(db, q);
+    return { ok: true, data: { granularity, from: q.from, to: q.to, count: rows.length, rows } };
+  });
+
+  /* ------------------------ Client (cobertura) ------------------------ */
+
+  const clientQuerySchema = z
+    .object({
+      from: z.coerce.number().int().positive(),
+      to: z.coerce.number().int().positive(),
+      granularity: z.enum(['5m', '1h', '1d']).optional(),
+      controllerId: z.string().min(1).max(64).optional(),
+      siteId: z.string().min(1).max(64).optional(),
+      clientMac: z.string().min(1).max(64).optional(),
+      apDeviceId: z.string().min(1).max(64).optional(),
+    })
+    .refine((v) => v.to > v.from, 'to deve ser maior que from')
+    .refine((v) => v.to - v.from <= 30 * 86400, 'janela máxima de 30 dias');
+
+  app.get('/api/v1/metrics/clients', { preHandler: app.requireAdmin() }, async (req) => {
+    const q = clientQuerySchema.parse(req.query);
+    const { rows, granularity } = queryClientMetrics(db, q);
+    return { ok: true, data: { granularity, from: q.from, to: q.to, count: rows.length, rows } };
   });
 }

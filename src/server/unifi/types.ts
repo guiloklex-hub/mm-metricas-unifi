@@ -52,12 +52,20 @@ export interface UnifiDevicePayload {
   radio_table_stats?: UnifiRadioStats[];
   /** 1 entrada por VAP (combinação SSID × rádio). */
   vap_table?: UnifiVapEntry[];
+  /** 1 entrada por porta física (switches). */
+  port_table?: UnifiPortStats[];
+  /** Sensores de temperatura (UDM, switches Pro, USP-PDU). */
+  temperature_objects?: UnifiTemperatureObject[];
   /** Snapshot de CPU/mem do AP — gauges, não cumulativos. */
   'system-stats'?: {
     cpu?: number | string;
     mem?: number | string;
     uptime?: number | string;
   };
+  /** Sensor de temperatura geral (alguns firmwares expõem aqui). */
+  general_temperature?: number;
+  has_fan?: boolean;
+  fan_level?: number;
   /**
    * Em controllers UniFi modernos, contadores agregados de tx/rx (incluindo
    * `tx_dropped`, `tx_errors`, `rx_*`) vivem dentro de `stat.ap.*`, não nos
@@ -103,9 +111,17 @@ export interface UnifiRadioStats {
   tx_packets?: number;
   tx_retries?: number;
   tx_bytes?: number;
-  cu_self_rx?: number;
-  cu_self_tx?: number;
+  /** Utilização total do canal (0-100). Soma do próprio AP + vizinhos. Métrica-chave de congestionamento. */
   cu_total?: number;
+  /** Parcela de `cu_total` causada por TX deste AP. */
+  cu_self_tx?: number;
+  /** Parcela causada por RX deste AP. `cu_total - cu_self_*` indica interferência externa. */
+  cu_self_rx?: number;
+  /** Satisfaction score do UniFi (0-100). 100 = ótimo. Métrica nativa de qualidade. */
+  satisfaction?: number;
+  ast_be_xmit?: number;
+  ast_cst?: number;
+  ast_txto?: number;
 }
 
 /**
@@ -117,12 +133,22 @@ export interface UnifiVapEntry {
   bssid?: string;
   essid?: string;
   radio?: string;
+  channel?: number;
   state?: string;
   is_guest?: boolean | number;
   num_sta?: number;
   avg_client_signal?: number;
   tx_bytes?: number;
   rx_bytes?: number;
+  tx_packets?: number;
+  rx_packets?: number;
+  tx_retries?: number;
+  tx_dropped?: number;
+  rx_dropped?: number;
+  /** Client Connection Quality (0-100). Métrica nativa do UniFi para qualidade percebida pelos clientes. */
+  ccq?: number;
+  /** Satisfaction score (0-100) específico do VAP. */
+  satisfaction?: number;
   mac_filter_rejections?: number;
 }
 
@@ -137,10 +163,128 @@ export interface UnifiClientPayload {
   hostname?: string;
   name?: string;
   ap_mac?: string;
+  /** SSID ao qual o cliente está conectado. */
+  essid?: string;
+  /** Nome do rádio (`ng`/`na`/`6e` ou alias). */
+  radio?: string;
+  channel?: number;
+  /** Sinal recebido pelo AP, dBm (negativo). -50 = ótimo, -75 = ruim. */
+  signal?: number;
+  /** Mesma coisa que signal em alguns firmwares. */
+  rssi?: number;
+  /** Noise floor visto pelo cliente, dBm. */
+  noise?: number;
+  /** Taxa de TX negociada em kbps. Dividir por 1000 para Mbps. */
+  tx_rate?: number;
+  /** Taxa de RX negociada em kbps. */
+  rx_rate?: number;
+  tx_retries?: number;
+  rx_retries?: number;
+  /** Segundos desde o último pacote. */
+  idle_time?: number;
+  /** Roams na sessão atual — alto indica instabilidade ou borda de cobertura. */
+  roam_count?: number;
+  is_wired?: boolean;
+  is_guest?: boolean;
   tx_bytes?: number;
   rx_bytes?: number;
   tx_packets?: number;
   rx_packets?: number;
+  /** Timestamp de associação (epoch s). */
+  assoc_time?: number;
+  /** Timestamp da última atividade. */
+  last_seen?: number;
+  uptime?: number;
+}
+
+/**
+ * Subset de `port_table[]` (switches UniFi). Cada entrada = uma porta física.
+ * Campos `*_r` (rx_*_r/tx_*_r) são deltas por segundo do controller;
+ * usamos os campos cumulativos para nosso próprio cálculo de delta.
+ */
+export interface UnifiPortStats {
+  port_idx?: number;
+  name?: string;
+  /** Porta habilitada via UI? */
+  enable?: boolean | number;
+  /** Link up? */
+  up?: boolean | number;
+  /** "FDX 1000", "HDX 100", etc. */
+  media?: string;
+  /** Velocidade em Mbps. */
+  speed?: number;
+  full_duplex?: boolean | number;
+  rx_bytes?: number;
+  tx_bytes?: number;
+  rx_packets?: number;
+  tx_packets?: number;
+  rx_errors?: number;
+  tx_errors?: number;
+  rx_dropped?: number;
+  tx_dropped?: number;
+  poe_enable?: boolean | number;
+  poe_mode?: string;
+  poe_power?: number | string;
+  poe_voltage?: number | string;
+  poe_class?: string;
+  poe_good?: boolean | number;
+}
+
+/**
+ * Subset de `temperature_objects[]` (presente em UDM, switches Pro, etc).
+ * Cada entrada representa um sensor distinto: CPU, PHY, board, etc.
+ */
+export interface UnifiTemperatureObject {
+  name?: string;
+  type?: string;
+  value?: number | string;
+}
+
+/**
+ * Payload do endpoint `/stat/event` ou `/list/event`. UniFi expõe vários tipos
+ * de evento (AP_Connected, AP_Lost_Contact, EVT_WU_Disconnected,
+ * EVT_AP_RestartedUnknown, etc). Os campos abaixo são os comuns; o resto
+ * vai em payloadJson opaco no DB.
+ */
+export interface UnifiEventPayload {
+  _id?: string;
+  /** Epoch ms. */
+  time?: number;
+  /** datetime ISO (alguns controllers retornam isso em vez de time). */
+  datetime?: string;
+  /** `EVT_AP_Connected`, `EVT_WU_Disconnected`, etc. */
+  key?: string;
+  /** Texto humano-legível. */
+  msg?: string;
+  /** MAC do AP relacionado (quando aplicável). */
+  ap?: string;
+  /** MAC do switch (quando o evento é de switch). */
+  sw?: string;
+  /** MAC do cliente (eventos de associação). */
+  user?: string;
+  /** SSID afetado. */
+  ssid?: string;
+  /** Severidade reportada pelo controller. */
+  admin?: string;
+  /** Algumas variantes expõem nível. */
+  level?: string;
+  hostname?: string;
+  guest?: string;
+  bytes?: number;
+  duration?: number;
+  ip?: string;
+}
+
+/** Resposta de `/list/alarm` — alarmes ativos no controller. */
+export interface UnifiAlarmPayload {
+  _id?: string;
+  time?: number;
+  datetime?: string;
+  key?: string;
+  msg?: string;
+  ap?: string;
+  sw?: string;
+  archived?: boolean;
 }
 
 /**
