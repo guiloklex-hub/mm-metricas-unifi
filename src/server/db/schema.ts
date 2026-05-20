@@ -233,6 +233,7 @@ export const counterState = sqliteTable(
     deviceId: text('device_id').notNull().default(''),
     radio: text('radio').notNull().default(''),
     clientMac: text('client_mac').notNull().default(''),
+    ssid: text('ssid').notNull().default(''),
     metric: text('metric').notNull(),
     lastValue: integer('last_value').notNull(),
     lastTs: integer('last_ts').notNull(),
@@ -240,10 +241,77 @@ export const counterState = sqliteTable(
   (t) => ({
     pk: primaryKey({
       name: 'counter_state_pk',
-      columns: [t.controllerId, t.siteId, t.deviceId, t.radio, t.clientMac, t.metric],
+      columns: [t.controllerId, t.siteId, t.deviceId, t.radio, t.clientMac, t.ssid, t.metric],
     }),
   }),
 );
+
+/* ---------- Séries temporais por VAP (SSID × rádio) ---------- */
+
+const vapMetricsColumns = {
+  ts: integer('ts').notNull(),
+  controllerId: text('controller_id').notNull(),
+  siteId: text('site_id').notNull(),
+  deviceId: text('device_id').notNull(),
+  radio: text('radio').notNull(),
+  ssid: text('ssid').notNull(),
+  /** Clientes conectados nesse VAP (gauge, snapshot). */
+  numSta: integer('num_sta'),
+  /** 1 se rede guest, 0 caso contrário. */
+  isGuest: integer('is_guest'),
+  /** Sinal médio dos clientes conectados (dBm, geralmente negativo). */
+  avgClientSignal: real('avg_client_signal'),
+  /** Counters cumulativos. */
+  txBytes: integer('tx_bytes'),
+  rxBytes: integer('rx_bytes'),
+  macFilterRejections: integer('mac_filter_rejections'),
+  /** Deltas calculados via counter_state. */
+  dTxBytes: integer('d_tx_bytes'),
+  dRxBytes: integer('d_rx_bytes'),
+  dMacFilterRejections: integer('d_mac_filter_rejections'),
+};
+
+export const metricsVap5m = sqliteTable('metrics_vap_5m', vapMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_vap_5m_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+    t.ssid,
+  ),
+  deviceTs: index('metrics_vap_5m_device_ts').on(t.deviceId, t.ts),
+  ssidTs: index('metrics_vap_5m_ssid_ts').on(t.ssid, t.ts),
+  controllerTs: index('metrics_vap_5m_controller_ts').on(t.controllerId, t.ts),
+}));
+
+export const metricsVap1h = sqliteTable('metrics_vap_1h', vapMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_vap_1h_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+    t.ssid,
+  ),
+  deviceTs: index('metrics_vap_1h_device_ts').on(t.deviceId, t.ts),
+  ssidTs: index('metrics_vap_1h_ssid_ts').on(t.ssid, t.ts),
+  controllerTs: index('metrics_vap_1h_controller_ts').on(t.controllerId, t.ts),
+}));
+
+export const metricsVap1d = sqliteTable('metrics_vap_1d', vapMetricsColumns, (t) => ({
+  uniqueDim: uniqueIndex('metrics_vap_1d_dim_unique').on(
+    t.ts,
+    t.controllerId,
+    t.siteId,
+    t.deviceId,
+    t.radio,
+    t.ssid,
+  ),
+  deviceTs: index('metrics_vap_1d_device_ts').on(t.deviceId, t.ts),
+  ssidTs: index('metrics_vap_1d_ssid_ts').on(t.ssid, t.ts),
+  controllerTs: index('metrics_vap_1d_controller_ts').on(t.controllerId, t.ts),
+}));
 
 /**
  * SQL extra rodado pelo client em todo startup (PRAGMAs idempotentes).

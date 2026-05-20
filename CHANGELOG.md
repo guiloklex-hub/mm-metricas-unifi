@@ -4,6 +4,32 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 
 ## [Unreleased]
 
+### Added — clientes e tráfego por SSID/banda
+- **3 tabelas novas**: `metrics_vap_5m`, `_1h`, `_1d` capturando 1 linha por
+  combinação `(device × rádio × SSID)` (VAP/BSSID). Migration 0004 cuida
+  da criação + adiciona coluna `ssid` no `counter_state` (rebuild da
+  tabela preservando dados antigos).
+- **Parser**: `parseVapTable()` filtra VAPs em RUN com `essid` válido,
+  captura `num_sta`, `is_guest`, `avg_client_signal`, `tx_bytes`,
+  `rx_bytes`, `mac_filter_rejections` por VAP.
+- **Pipeline completo**: `insertVapSamples5m`, `queryVapMetrics`,
+  `rollupVap5mTo1h`, `rollupVap1hTo1d`, retenção integrada.
+- **Endpoints**:
+  - `GET /api/v1/metrics/vap` — query histórica com filtros
+    (controllerId, siteId, deviceId, radio, ssid).
+  - `GET /api/v1/metrics/vap/recent?seconds=N` — Dashboard usa esse.
+- **Dashboard**: 2 cards novos antes de "Resumo por AP":
+  - "Clientes por banda" — gauge 2.4/5/6 GHz com total destacado.
+  - "Por SSID" — tabela: SSID · Tipo (Corp/Guest) · Clientes (pico) ·
+    distribuição por banda · Bytes Tx/Rx.
+- **CSV/ZIP**: novo nível `vap` (`por-ssid_{from}_{to}.csv`) com colunas
+  legíveis (controller_name, site_name, device_label, etc.).
+- **PDF**: nova seção "Por SSID" após "Por AP" com tabela: SSID · Banda ·
+  Tipo · Clientes pico · Bytes Tx/Rx. Sort por tráfego total desc.
+- **ReportsPage**: chip "Por SSID" no seletor de níveis.
+
+Tests: 145 → 148 (parseVapTable, insertVapSamples5m).
+
 ### Fixed — taxas matematicamente impossíveis (>100%) corrigidas
 
 Bug duplo descoberto pelo usuário ao auditar o PDF: alguns APs apareciam

@@ -16,16 +16,17 @@ const PRESET_SECONDS: Record<Exclude<Preset, 'custom'>, number> = {
   '90d': 90 * 86400,
 };
 
-type Level = 'site' | 'device' | 'radio' | 'client';
+type Level = 'site' | 'device' | 'radio' | 'client' | 'vap';
 
 const LEVEL_LABELS: Record<Level, string> = {
   site: 'Por site',
   device: 'Por antena',
   radio: 'Por rádio',
   client: 'Por cliente',
+  vap: 'Por SSID',
 };
 
-const ALL_LEVELS: Level[] = ['site', 'device', 'radio', 'client'];
+const ALL_LEVELS: Level[] = ['site', 'device', 'radio', 'client', 'vap'];
 
 function defaultIsoDate(offsetSec: number): string {
   return new Date((Math.floor(Date.now() / 1000) + offsetSec) * 1000).toISOString().slice(0, 16);

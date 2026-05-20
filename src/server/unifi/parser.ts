@@ -1,5 +1,10 @@
 import type { Radio } from '@shared/schemas/metrics.ts';
-import type { UnifiClientPayload, UnifiDevicePayload, UnifiRadioStats } from './types.ts';
+import type {
+  UnifiClientPayload,
+  UnifiDevicePayload,
+  UnifiRadioStats,
+  UnifiVapEntry,
+} from './types.ts';
 
 /**
  * Parser dos payloads UniFi → amostras canônicas para o storage.
@@ -55,6 +60,19 @@ export interface ParsedSample {
 export interface ParsedDeviceResult {
   device: ParsedDevice;
   samples: ParsedSample[]; // 1 por rádio + 1 device-aggregate
+}
+
+/** Snapshot por (SSID × rádio × device) — vem do `vap_table` do payload. */
+export interface ParsedVapSample {
+  deviceMac: string;
+  radio: Radio;
+  ssid: string;
+  numSta: number | null;
+  isGuest: boolean | null;
+  avgClientSignal: number | null;
+  txBytes: number | null;
+  rxBytes: number | null;
+  macFilterRejections: number | null;
 }
 
 /* ----------------------------- Public API ----------------------------- */
@@ -263,6 +281,41 @@ export function parseClientPayload(c: UnifiClientPayload): ParsedSample | null {
   };
 }
 
+/**
+ * Extrai 1 ParsedVapSample por entrada do `vap_table` do payload. Filtra:
+ * - VAPs sem `essid` (não identificáveis)
+ * - VAPs com `state !== 'RUN'` (desativados / em fault)
+ * - radio inválido (firmware antigo com nome desconhecido)
+ *
+ * 1 AP × N SSIDs × M rádios = N×M entradas. Em rede típica = 4-10 entradas por AP.
+ */
+export function parseVapTable(d: UnifiDevicePayload): ParsedVapSample[] {
+  const mac = typeof d.mac === 'string' ? normalizeMac(d.mac) : null;
+  if (!mac) return [];
+  const table = Array.isArray(d.vap_table) ? d.vap_table : [];
+  const out: ParsedVapSample[] = [];
+  for (const v of table) {
+    if (!v || typeof v !== 'object') continue;
+    if (typeof v.state === 'string' && v.state !== 'RUN') continue;
+    const essid = pickString(v.essid);
+    if (!essid) continue;
+    const radio = normalizeRadio(v as UnifiVapEntry as UnifiRadioStats);
+    if (!radio) continue;
+    out.push({
+      deviceMac: mac,
+      radio,
+      ssid: essid,
+      numSta: intOrNull(v.num_sta),
+      isGuest: v.is_guest == null ? null : Boolean(v.is_guest),
+      avgClientSignal: floatOrNullSigned(v.avg_client_signal),
+      txBytes: intOrNull(v.tx_bytes),
+      rxBytes: intOrNull(v.rx_bytes),
+      macFilterRejections: intOrNull(v.mac_filter_rejections),
+    });
+  }
+  return out;
+}
+
 /* ----------------------------- Helpers ----------------------------- */
 
 export function normalizeMac(input: string): string {
@@ -327,6 +380,19 @@ function floatOrNull(value: unknown): number | null {
   if (n === null) return null;
   if (!Number.isFinite(n)) return null;
   if (n < 0) return null;
+  return n;
+}
+
+/** Aceita valores com sinal (dBm, etc). Mesmo `floatOrNull` mas sem clamp em 0. */
+function floatOrNullSigned(value: unknown): number | null {
+  let n: number | null = null;
+  if (typeof value === 'number') n = value;
+  else if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) n = parsed;
+  }
+  if (n === null) return null;
+  if (!Number.isFinite(n)) return null;
   return n;
 }
 

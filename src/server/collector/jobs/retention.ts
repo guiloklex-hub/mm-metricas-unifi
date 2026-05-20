@@ -11,6 +11,8 @@ export interface RetentionConfig {
 export interface RetentionResult {
   purged5m: number;
   purged1h: number;
+  purgedVap5m: number;
+  purgedVap1h: number;
 }
 
 /**
@@ -32,8 +34,13 @@ export async function runRetention(
 
   const purged5m = purgeOlderThan(db, 'metrics_5m', threshold5m);
   const purged1h = purgeOlderThan(db, 'metrics_1h', threshold1h);
+  const purgedVap5m = purgeOlderThan(db, 'metrics_vap_5m', threshold5m);
+  const purgedVap1h = purgeOlderThan(db, 'metrics_vap_1h', threshold1h);
   optimize(db);
 
-  logger.info({ purged5m, purged1h, threshold5m, threshold1h }, 'retention concluída');
-  return { purged5m, purged1h };
+  logger.info(
+    { purged5m, purged1h, purgedVap5m, purgedVap1h, threshold5m, threshold1h },
+    'retention concluída',
+  );
+  return { purged5m, purged1h, purgedVap5m, purgedVap1h };
 }

@@ -50,6 +50,8 @@ export interface UnifiDevicePayload {
   'user-num_sta'?: number;
   'guest-num_sta'?: number;
   radio_table_stats?: UnifiRadioStats[];
+  /** 1 entrada por VAP (combinação SSID × rádio). */
+  vap_table?: UnifiVapEntry[];
   /** Snapshot de CPU/mem do AP — gauges, não cumulativos. */
   'system-stats'?: {
     cpu?: number | string;
@@ -104,6 +106,24 @@ export interface UnifiRadioStats {
   cu_self_rx?: number;
   cu_self_tx?: number;
   cu_total?: number;
+}
+
+/**
+ * Subset do `vap_table` (Virtual AP / SSID × rádio) que efetivamente consumimos.
+ * O objeto completo tem ~30 chaves incluindo bar charts, ccq, satisfaction —
+ * aqui só listamos contadores agregados que viram colunas no banco.
+ */
+export interface UnifiVapEntry {
+  bssid?: string;
+  essid?: string;
+  radio?: string;
+  state?: string;
+  is_guest?: boolean | number;
+  num_sta?: number;
+  avg_client_signal?: number;
+  tx_bytes?: number;
+  rx_bytes?: number;
+  mac_filter_rejections?: number;
 }
 
 export interface UnifiSitePayload {

@@ -175,11 +175,75 @@ export function rollup1hTo1d(db: DB, fromTs: number, toTs: number): RollupResult
  */
 export function purgeOlderThan(
   db: DB,
-  table: 'metrics_5m' | 'metrics_1h',
+  table: 'metrics_5m' | 'metrics_1h' | 'metrics_vap_5m' | 'metrics_vap_1h',
   thresholdTs: number,
 ): number {
   const res = db.$client.prepare(`DELETE FROM ${table} WHERE ts < ?`).run(thresholdTs);
   return res.changes;
+}
+
+/* ----------------------- Rollup VAP (SSID × rádio) ----------------------- */
+
+function buildVapRollupSql(opts: {
+  source: 'metrics_vap_5m' | 'metrics_vap_1h';
+  target: 'metrics_vap_1h' | 'metrics_vap_1d';
+  bucketSeconds: number;
+}): string {
+  return `
+    INSERT INTO ${opts.target} (
+      ts, controller_id, site_id, device_id, radio, ssid,
+      num_sta, is_guest, avg_client_signal,
+      tx_bytes, rx_bytes, mac_filter_rejections,
+      d_tx_bytes, d_rx_bytes, d_mac_filter_rejections
+    )
+    SELECT
+      (ts / ${opts.bucketSeconds}) * ${opts.bucketSeconds} AS bucket_ts,
+      controller_id, site_id, device_id, radio, ssid,
+      MAX(num_sta) AS num_sta, -- pico de clientes na janela
+      MAX(is_guest) AS is_guest,
+      AVG(avg_client_signal) AS avg_client_signal,
+      MAX(tx_bytes) AS tx_bytes,
+      MAX(rx_bytes) AS rx_bytes,
+      MAX(mac_filter_rejections) AS mac_filter_rejections,
+      SUM(d_tx_bytes) AS d_tx_bytes,
+      SUM(d_rx_bytes) AS d_rx_bytes,
+      SUM(d_mac_filter_rejections) AS d_mac_filter_rejections
+    FROM ${opts.source}
+    WHERE ts >= ? AND ts < ?
+    GROUP BY bucket_ts, controller_id, site_id, device_id, radio, ssid
+    ON CONFLICT(ts, controller_id, site_id, device_id, radio, ssid) DO UPDATE SET
+      num_sta = excluded.num_sta,
+      is_guest = excluded.is_guest,
+      avg_client_signal = excluded.avg_client_signal,
+      tx_bytes = excluded.tx_bytes,
+      rx_bytes = excluded.rx_bytes,
+      mac_filter_rejections = excluded.mac_filter_rejections,
+      d_tx_bytes = excluded.d_tx_bytes,
+      d_rx_bytes = excluded.d_rx_bytes,
+      d_mac_filter_rejections = excluded.d_mac_filter_rejections
+  `;
+}
+
+const SQL_VAP_5M_TO_1H = buildVapRollupSql({
+  source: 'metrics_vap_5m',
+  target: 'metrics_vap_1h',
+  bucketSeconds: BUCKET_1H_SECONDS,
+});
+
+const SQL_VAP_1H_TO_1D = buildVapRollupSql({
+  source: 'metrics_vap_1h',
+  target: 'metrics_vap_1d',
+  bucketSeconds: BUCKET_1D_SECONDS,
+});
+
+export function rollupVap5mTo1h(db: DB, fromTs: number, toTs: number): RollupResult {
+  const res = db.$client.prepare(SQL_VAP_5M_TO_1H).run(fromTs, toTs);
+  return { bucketsAffected: res.changes, fromTs, toTs };
+}
+
+export function rollupVap1hTo1d(db: DB, fromTs: number, toTs: number): RollupResult {
+  const res = db.$client.prepare(SQL_VAP_1H_TO_1D).run(fromTs, toTs);
+  return { bucketsAffected: res.changes, fromTs, toTs };
 }
 
 /** PRAGMA optimize após operações pesadas para SQLite ajustar estatísticas. */

@@ -56,6 +56,15 @@ export interface PdfReportInput {
     totalRxDropped: number;
     totalRxErrors: number;
   };
+  /** Resumo por SSID (vap_table) — opcional. Quando vazio, seção não é desenhada. */
+  ssidSummary?: Array<{
+    ssid: string;
+    radio: string;
+    maxNumSta: number | null;
+    totalBytes: number;
+    totalRxBytes: number;
+    isGuest: boolean;
+  }>;
 }
 
 export interface PdfStreamHandle {
@@ -82,6 +91,10 @@ export function renderMetricsReport(input: PdfReportInput): PDFKit.PDFDocument {
   doc.addPage();
   drawTotals(doc, input);
   drawDeviceTable(doc, input);
+  if (input.ssidSummary && input.ssidSummary.length > 0) {
+    doc.addPage();
+    drawSsidTable(doc, input.ssidSummary);
+  }
 
   doc.end();
   return doc;
@@ -267,6 +280,86 @@ function drawDeviceTable(doc: PDFKit.PDFDocument, input: PdfReportInput): void {
     let x = startX;
     for (let i = 0; i < TABLE_COLS.length; i += 1) {
       const c = TABLE_COLS[i]!;
+      doc.text(values[i] ?? '', x, y, { width: c.width, align: c.align ?? 'left' });
+      x += c.width;
+    }
+    y += rowHeight + 4;
+    rowIndex += 1;
+  }
+}
+
+/* --------- SSID (VAP) table --------- */
+
+const SSID_COLS: Col[] = [
+  { label: 'SSID', width: 180 },
+  { label: 'Banda', width: 60 },
+  { label: 'Tipo', width: 60 },
+  { label: 'Clientes (pico)', width: 90, align: 'right' },
+  { label: 'Bytes Tx', width: 100, align: 'right' },
+  { label: 'Bytes Rx', width: 100, align: 'right' },
+];
+const SSID_TOTAL_WIDTH = SSID_COLS.reduce((acc, c) => acc + c.width, 0);
+
+function bandLabel(radio: string): string {
+  if (radio === 'ng') return '2.4 GHz';
+  if (radio === 'na') return '5 GHz';
+  if (radio === '6e') return '6 GHz';
+  return radio;
+}
+
+function drawSsidHeader(doc: PDFKit.PDFDocument, startX: number, y: number): number {
+  doc.font('Helvetica-Bold').fontSize(9);
+  let x = startX;
+  for (const c of SSID_COLS) {
+    doc.text(c.label, x, y, { width: c.width, align: c.align ?? 'left' });
+    x += c.width;
+  }
+  doc
+    .moveTo(startX, y + 12)
+    .lineTo(startX + SSID_TOTAL_WIDTH, y + 12)
+    .stroke('#999');
+  return y + 14;
+}
+
+function drawSsidTable(
+  doc: PDFKit.PDFDocument,
+  rows: NonNullable<PdfReportInput['ssidSummary']>,
+): void {
+  doc.font('Helvetica-Bold').fontSize(16).text('Por SSID').moveDown(0.5);
+  const startX = doc.page.margins.left;
+  let y = drawSsidHeader(doc, startX, doc.y);
+
+  doc.font('Helvetica').fontSize(9);
+  let rowIndex = 0;
+  for (const row of rows) {
+    const values: string[] = [
+      row.ssid,
+      bandLabel(row.radio),
+      row.isGuest ? 'Guest' : 'Corp',
+      formatNumber(row.maxNumSta),
+      formatBytes(row.totalBytes),
+      formatBytes(row.totalRxBytes),
+    ];
+    const rowHeight = Math.max(
+      ...values.map((v, i) => doc.heightOfString(v, { width: SSID_COLS[i]!.width })),
+      11,
+    );
+    if (y + rowHeight + 6 > doc.page.height - doc.page.margins.bottom) {
+      doc.addPage();
+      y = drawSsidHeader(doc, startX, doc.page.margins.top);
+      doc.font('Helvetica').fontSize(9);
+    }
+    if (rowIndex % 2 === 1) {
+      doc
+        .save()
+        .rect(startX, y - 2, SSID_TOTAL_WIDTH, rowHeight + 4)
+        .fill('#f5f5f5')
+        .restore();
+      doc.fillColor('#000');
+    }
+    let x = startX;
+    for (let i = 0; i < SSID_COLS.length; i += 1) {
+      const c = SSID_COLS[i]!;
       doc.text(values[i] ?? '', x, y, { width: c.width, align: c.align ?? 'left' });
       x += c.width;
     }

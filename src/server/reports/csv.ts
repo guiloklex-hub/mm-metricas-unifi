@@ -10,7 +10,7 @@
  * linha. O caller é responsável por escrever em um stream/reply.raw.
  */
 
-import type { MetricRow } from '@server/db/queries/metrics-read.ts';
+import type { MetricRow, VapRow } from '@server/db/queries/metrics-read.ts';
 import type { LabelMaps } from '@server/reports/labels.ts';
 
 export function csvField(value: string | number | null | undefined): string {
@@ -131,13 +131,14 @@ export function metricRowToCsv(r: CsvMetricRow): string {
 
 /* ---------- v2: builders por nível com colunas legíveis ---------- */
 
-export type CsvLevel = 'site' | 'device' | 'radio' | 'client';
+export type CsvLevel = 'site' | 'device' | 'radio' | 'client' | 'vap';
 
 export const CSV_FILENAME_BY_LEVEL: Record<CsvLevel, string> = {
   site: 'por-site.csv',
   device: 'por-antena.csv',
   radio: 'por-radio.csv',
   client: 'por-cliente.csv',
+  vap: 'por-ssid.csv',
 };
 
 const COMMON_METRIC_COLS = [
@@ -221,7 +222,8 @@ export const CLIENT_CSV_HEADER = csvRow([
   ...COMMON_METRIC_COLS,
 ]);
 
-export const CSV_HEADER_BY_LEVEL: Record<CsvLevel, string> = {
+/** Headers para os 4 níveis de `metrics_*`. `vap` é tratado separadamente. */
+export const CSV_HEADER_BY_LEVEL: Record<Exclude<CsvLevel, 'vap'>, string> = {
   site: SITE_CSV_HEADER,
   device: DEVICE_CSV_HEADER,
   radio: RADIO_CSV_HEADER,
@@ -347,8 +349,12 @@ export function clientRowToCsv(r: MetricRow, labels: LabelMaps): string {
   ]);
 }
 
+/**
+ * Builder por nível para metrics_*. O nível 'vap' tem schema próprio
+ * (VapRow ≠ MetricRow), então é tratado separadamente pelo handler.
+ */
 export const CSV_ROW_BUILDER_BY_LEVEL: Record<
-  CsvLevel,
+  Exclude<CsvLevel, 'vap'>,
   (r: MetricRow, labels: LabelMaps) => string
 > = {
   site: siteRowToCsv,
@@ -356,3 +362,54 @@ export const CSV_ROW_BUILDER_BY_LEVEL: Record<
   radio: radioRowToCsv,
   client: clientRowToCsv,
 };
+
+/* ----------------------- VAP (SSID × rádio) ----------------------- */
+
+export const VAP_CSV_HEADER = csvRow([
+  'ts',
+  'timestamp_utc',
+  'controller_id',
+  'controller_name',
+  'site_id',
+  'site_name',
+  'device_id',
+  'device_label',
+  'device_mac',
+  'device_name',
+  'device_alias',
+  'radio',
+  'ssid',
+  'is_guest',
+  'num_sta',
+  'avg_client_signal',
+  'd_tx_bytes',
+  'd_rx_bytes',
+  'd_mac_filter_rejections',
+]);
+
+export function vapRowToCsv(r: VapRow, labels: LabelMaps): string {
+  const ctrl = labels.controllerName.get(r.controllerId) ?? '';
+  const site = labels.siteName.get(r.siteId) ?? '';
+  const dev = labels.device.get(r.deviceId);
+  return csvRow([
+    r.ts,
+    isoUtc(r.ts),
+    r.controllerId,
+    ctrl,
+    r.siteId,
+    site,
+    r.deviceId,
+    dev?.label ?? '',
+    dev?.mac ?? '',
+    dev?.name ?? '',
+    dev?.alias ?? '',
+    r.radio,
+    r.ssid,
+    r.isGuest == null ? '' : r.isGuest ? '1' : '0',
+    r.numSta,
+    r.avgClientSignal,
+    r.dTxBytes,
+    r.dRxBytes,
+    r.dMacFilterRejections,
+  ]);
+}

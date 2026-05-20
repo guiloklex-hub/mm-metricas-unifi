@@ -3,6 +3,7 @@ import { useControllers } from '../api/queries/controllers.ts';
 import { useDevices } from '../api/queries/devices.ts';
 import { useMetricsRecent, useMetricsStatus } from '../api/queries/metrics.ts';
 import { useTopTalkers } from '../api/queries/top-talkers.ts';
+import { useVapRecent, type VapRow } from '../api/queries/vap-metrics.ts';
 import { type HeatmapCell, HourlyHeatmap } from '../components/charts/HourlyHeatmap.tsx';
 import { TimeSeriesChart, type TimeSeriesSeries } from '../components/charts/TimeSeriesChart.tsx';
 import { Card } from '../components/ui/Card.tsx';
@@ -66,6 +67,12 @@ export function DashboardPage() {
     controllerId,
     limit: 10,
   });
+  const vap = useVapRecent({
+    seconds: WINDOW_SECONDS[windowKey],
+    controllerId,
+  });
+  const bandSummary = useMemo(() => summarizeBands(vap.data?.rows ?? []), [vap.data]);
+  const ssidSummary = useMemo(() => summarizeSsids(vap.data?.rows ?? []), [vap.data]);
 
   return (
     <div className="space-y-6">
@@ -171,6 +178,76 @@ export function DashboardPage() {
                     <td className="px-3 py-2">{formatBytes(t.totalBytes)}</td>
                     <td className="px-3 py-2">{formatNumber(t.totalPackets)}</td>
                     <td className="px-3 py-2">{t.samples}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </QueryState>
+      </Card>
+
+      <Card title="Clientes por banda">
+        <QueryState
+          isLoading={vap.isLoading}
+          isError={vap.isError}
+          error={vap.error}
+          isEmpty={bandSummary.totalSta === 0 && !vap.isLoading}
+          emptyText="Sem dados de VAP na janela. Aguarde 1 ciclo de coleta após o redeploy."
+        >
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <BandCounter label="2.4 GHz" value={bandSummary.ng} />
+            <BandCounter label="5 GHz" value={bandSummary.na} />
+            <BandCounter label="6 GHz" value={bandSummary.sixE} />
+            <BandCounter label="Total" value={bandSummary.totalSta} highlight />
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Pico de clientes simultâneos na janela selecionada, agregado entre todos os APs.
+          </p>
+        </QueryState>
+      </Card>
+
+      <Card title="Por SSID">
+        <QueryState
+          isLoading={vap.isLoading}
+          isError={vap.isError}
+          error={vap.error}
+          isEmpty={ssidSummary.length === 0 && !vap.isLoading}
+          emptyText="Sem dados de SSID na janela."
+        >
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-3 py-2">SSID</th>
+                  <th className="px-3 py-2">Tipo</th>
+                  <th className="px-3 py-2" title="Pico de clientes na janela">
+                    Clientes (pico)
+                  </th>
+                  <th className="px-3 py-2">2.4 / 5 / 6 GHz</th>
+                  <th className="px-3 py-2">Bytes Tx</th>
+                  <th className="px-3 py-2">Bytes Rx</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {ssidSummary.map((s) => (
+                  <tr key={s.ssid}>
+                    <td className="px-3 py-2 font-medium">{s.ssid}</td>
+                    <td className="px-3 py-2 text-xs">
+                      {s.isGuest ? (
+                        <span className="rounded bg-yellow-100 px-2 py-0.5 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-200">
+                          Guest
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">Corp</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-semibold">{formatNumber(s.maxClients)}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500">
+                      {formatNumber(s.byBand.ng)} / {formatNumber(s.byBand.na)} /{' '}
+                      {formatNumber(s.byBand.sixE)}
+                    </td>
+                    <td className="px-3 py-2">{formatBytes(s.totalBytes)}</td>
+                    <td className="px-3 py-2">{formatBytes(s.totalRxBytes)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -422,4 +499,107 @@ function summarizeDevices(
     });
   }
   return out.sort((a, b) => b.totalBytes - a.totalBytes);
+}
+
+/* -------------------------- VAP (SSID × banda) -------------------------- */
+
+interface BandSummary {
+  ng: number;
+  na: number;
+  sixE: number;
+  totalSta: number;
+}
+
+/**
+ * Soma os picos de num_sta por (device × radio × ssid). Esse total é "clientes
+ * únicos por banda no momento de pico", não a soma de todos os tempos —
+ * usamos `MAX` no último timestamp da janela para ter snapshot atual.
+ */
+function summarizeBands(rows: VapRow[]): BandSummary {
+  if (rows.length === 0) return { ng: 0, na: 0, sixE: 0, totalSta: 0 };
+  // Pega só o último ts (snapshot mais recente) — soma num_sta cross-VAP.
+  let maxTs = 0;
+  for (const r of rows) if (r.ts > maxTs) maxTs = r.ts;
+  const sum = { ng: 0, na: 0, sixE: 0 };
+  for (const r of rows) {
+    if (r.ts !== maxTs) continue;
+    if (r.numSta == null) continue;
+    if (r.radio === 'ng') sum.ng += r.numSta;
+    else if (r.radio === 'na') sum.na += r.numSta;
+    else if (r.radio === '6e') sum.sixE += r.numSta;
+  }
+  return { ...sum, totalSta: sum.ng + sum.na + sum.sixE };
+}
+
+interface SsidSummaryRow {
+  ssid: string;
+  isGuest: boolean;
+  maxClients: number;
+  totalBytes: number;
+  totalRxBytes: number;
+  byBand: { ng: number; na: number; sixE: number };
+}
+
+function summarizeSsids(rows: VapRow[]): SsidSummaryRow[] {
+  // Encontra ts mais recente para o "snapshot" de clientes por banda.
+  let maxTs = 0;
+  for (const r of rows) if (r.ts > maxTs) maxTs = r.ts;
+  type Agg = SsidSummaryRow;
+  const acc = new Map<string, Agg>();
+  for (const r of rows) {
+    let cur = acc.get(r.ssid);
+    if (!cur) {
+      cur = {
+        ssid: r.ssid,
+        isGuest: false,
+        maxClients: 0,
+        totalBytes: 0,
+        totalRxBytes: 0,
+        byBand: { ng: 0, na: 0, sixE: 0 },
+      };
+      acc.set(r.ssid, cur);
+    }
+    if (r.isGuest === true) cur.isGuest = true;
+    cur.totalBytes += r.dTxBytes ?? 0;
+    cur.totalRxBytes += r.dRxBytes ?? 0;
+    // Por-banda counts só no snapshot mais recente (gauge).
+    if (r.ts === maxTs && r.numSta != null) {
+      if (r.radio === 'ng') cur.byBand.ng += r.numSta;
+      else if (r.radio === 'na') cur.byBand.na += r.numSta;
+      else if (r.radio === '6e') cur.byBand.sixE += r.numSta;
+    }
+  }
+  for (const v of acc.values()) {
+    v.maxClients = v.byBand.ng + v.byBand.na + v.byBand.sixE;
+  }
+  return [...acc.values()].sort((a, b) => b.maxClients - a.maxClients);
+}
+
+function BandCounter({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border px-4 py-3 ${
+        highlight
+          ? 'border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40'
+          : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+      }`}
+    >
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p
+        className={`mt-1 text-2xl font-semibold ${
+          highlight ? 'text-blue-900 dark:text-blue-200' : ''
+        }`}
+      >
+        {value.toLocaleString('pt-BR')}
+      </p>
+    </div>
+  );
 }

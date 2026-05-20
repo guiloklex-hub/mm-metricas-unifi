@@ -8,6 +8,12 @@ const TABLE_BY_GRAN: Record<Granularity, string> = {
   '1d': 'metrics_1d',
 };
 
+const VAP_TABLE_BY_GRAN: Record<Granularity, string> = {
+  '5m': 'metrics_vap_5m',
+  '1h': 'metrics_vap_1h',
+  '1d': 'metrics_vap_1d',
+};
+
 export interface MetricRow {
   ts: number;
   controllerId: string;
@@ -183,6 +189,112 @@ export function queryMetrics(
     retryRate: r.retryRate,
     errorRate: r.errorRate,
     dropRate: r.dropRate,
+  }));
+
+  return { rows, granularity };
+}
+
+/* -------------------------- VAP (SSID × rádio) -------------------------- */
+
+export interface VapRow {
+  ts: number;
+  controllerId: string;
+  siteId: string;
+  deviceId: string;
+  radio: 'ng' | 'na' | '6e';
+  ssid: string;
+  numSta: number | null;
+  isGuest: boolean | null;
+  avgClientSignal: number | null;
+  dTxBytes: number | null;
+  dRxBytes: number | null;
+  dMacFilterRejections: number | null;
+}
+
+export interface QueryVapArgs {
+  from: number;
+  to: number;
+  granularity?: Granularity;
+  controllerId?: string;
+  siteId?: string;
+  deviceId?: string;
+  radio?: 'ng' | 'na' | '6e';
+  ssid?: string;
+  limit?: number;
+}
+
+export function queryVapMetrics(
+  db: DB,
+  args: QueryVapArgs,
+): { rows: VapRow[]; granularity: Granularity } {
+  const granularity = args.granularity ?? chooseGranularity(args.from, args.to);
+  const table = VAP_TABLE_BY_GRAN[granularity];
+
+  const where: string[] = ['ts >= ?', 'ts <= ?'];
+  const params: Array<string | number> = [args.from, args.to];
+  if (args.controllerId) {
+    where.push('controller_id = ?');
+    params.push(args.controllerId);
+  }
+  if (args.siteId) {
+    where.push('site_id = ?');
+    params.push(args.siteId);
+  }
+  if (args.deviceId) {
+    where.push('device_id = ?');
+    params.push(args.deviceId);
+  }
+  if (args.radio) {
+    where.push('radio = ?');
+    params.push(args.radio);
+  }
+  if (args.ssid) {
+    where.push('ssid = ?');
+    params.push(args.ssid);
+  }
+
+  const limit = args.limit ?? 100_000;
+  const sql = `
+    SELECT ts, controller_id AS controllerId, site_id AS siteId,
+           device_id AS deviceId, radio, ssid,
+           num_sta AS numSta, is_guest AS isGuest,
+           avg_client_signal AS avgClientSignal,
+           d_tx_bytes AS dTxBytes, d_rx_bytes AS dRxBytes,
+           d_mac_filter_rejections AS dMacFilterRejections
+    FROM ${table}
+    WHERE ${where.join(' AND ')}
+    ORDER BY ts ASC
+    LIMIT ?`;
+  params.push(limit);
+
+  const raw = db.$client.prepare(sql).all(...params) as Array<{
+    ts: number;
+    controllerId: string;
+    siteId: string;
+    deviceId: string;
+    radio: 'ng' | 'na' | '6e';
+    ssid: string;
+    numSta: number | null;
+    isGuest: number | null;
+    avgClientSignal: number | null;
+    dTxBytes: number | null;
+    dRxBytes: number | null;
+    dMacFilterRejections: number | null;
+  }>;
+
+  const rows: VapRow[] = raw.map((r) => ({
+    ts: r.ts,
+    controllerId: r.controllerId,
+    siteId: r.siteId,
+    deviceId: r.deviceId,
+    radio: r.radio,
+    ssid: r.ssid,
+    numSta: r.numSta,
+    isGuest: r.isGuest === null ? null : r.isGuest === 1,
+    avgClientSignal: r.avgClientSignal,
+    dTxBytes: r.dTxBytes,
+    dRxBytes: r.dRxBytes,
+    dMacFilterRejections: r.dMacFilterRejections,
   }));
 
   return { rows, granularity };

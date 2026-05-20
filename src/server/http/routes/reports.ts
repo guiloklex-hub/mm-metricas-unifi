@@ -1,6 +1,6 @@
 import type { DB } from '@server/db/client.ts';
 import { getController } from '@server/db/queries/controllers.ts';
-import { queryMetrics } from '@server/db/queries/metrics-read.ts';
+import { queryMetrics, queryVapMetrics } from '@server/db/queries/metrics-read.ts';
 import { listAllSites } from '@server/db/queries/sites.ts';
 import {
   CSV_FILENAME_BY_LEVEL,
@@ -9,6 +9,8 @@ import {
   type CsvLevel,
   METRIC_CSV_HEADER,
   metricRowToCsv,
+  VAP_CSV_HEADER,
+  vapRowToCsv,
 } from '@server/reports/csv.ts';
 import { buildLabelMaps } from '@server/reports/labels.ts';
 import { renderMetricsReport } from '@server/reports/pdf.ts';
@@ -26,8 +28,11 @@ interface ArchiverV8Module {
 const archiverMod = (await import('archiver')) as unknown as ArchiverV8Module;
 const ZipArchive = archiverMod.ZipArchive;
 
-const LEVELS: readonly CsvLevel[] = ['site', 'device', 'radio', 'client'];
-const LEVEL_TO_GROUP_BY: Record<CsvLevel, 'site' | 'device' | 'radio' | 'client'> = {
+const LEVELS: readonly CsvLevel[] = ['site', 'device', 'radio', 'client', 'vap'];
+const LEVEL_TO_GROUP_BY: Record<
+  Exclude<CsvLevel, 'vap'>,
+  'site' | 'device' | 'radio' | 'client'
+> = {
   site: 'site',
   device: 'device',
   radio: 'radio',
@@ -137,14 +142,20 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
     reply.raw.setHeader('content-disposition', `attachment; filename="${filename}"`);
     reply.raw.setHeader('cache-control', 'no-store');
     reply.raw.write(UTF8_BOM);
-    reply.raw.write(CSV_HEADER_BY_LEVEL[level]);
-    const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
-    const { rows } = queryMetrics(db, {
-      ...q,
-      groupBy: LEVEL_TO_GROUP_BY[level],
-      limit: 1_000_000,
-    });
-    for (const r of rows) reply.raw.write(builder(r, labels));
+    if (level === 'vap') {
+      reply.raw.write(VAP_CSV_HEADER);
+      const { rows } = queryVapMetrics(db, { ...q, limit: 1_000_000 });
+      for (const r of rows) reply.raw.write(vapRowToCsv(r, labels));
+    } else {
+      reply.raw.write(CSV_HEADER_BY_LEVEL[level]);
+      const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
+      const { rows } = queryMetrics(db, {
+        ...q,
+        groupBy: LEVEL_TO_GROUP_BY[level],
+        limit: 1_000_000,
+      });
+      for (const r of rows) reply.raw.write(builder(r, labels));
+    }
     reply.raw.end();
   });
 
@@ -308,6 +319,49 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       })
       .sort((a, b) => b.totalBytes + b.totalRxBytes - (a.totalBytes + a.totalRxBytes));
 
+    // Agrega VAP (SSID × rádio) para a seção "Por SSID" do PDF.
+    const { rows: vapRows } = queryVapMetrics(db, {
+      from: q.from,
+      to: q.to,
+      granularity,
+      controllerId: q.controllerId,
+      siteId: q.siteId,
+      limit: 500_000,
+    });
+    type SsidAgg = {
+      ssid: string;
+      radio: string;
+      maxNumSta: number | null;
+      totalBytes: number;
+      totalRxBytes: number;
+      isGuest: boolean;
+    };
+    const ssidAgg = new Map<string, SsidAgg>();
+    for (const v of vapRows) {
+      const key = `${v.ssid}::${v.radio}`;
+      let cur = ssidAgg.get(key);
+      if (!cur) {
+        cur = {
+          ssid: v.ssid,
+          radio: v.radio,
+          maxNumSta: null,
+          totalBytes: 0,
+          totalRxBytes: 0,
+          isGuest: v.isGuest === true,
+        };
+        ssidAgg.set(key, cur);
+      }
+      if (v.numSta != null) {
+        cur.maxNumSta = cur.maxNumSta == null ? v.numSta : Math.max(cur.maxNumSta, v.numSta);
+      }
+      cur.totalBytes += v.dTxBytes ?? 0;
+      cur.totalRxBytes += v.dRxBytes ?? 0;
+      if (v.isGuest === true) cur.isGuest = true;
+    }
+    const ssidSummary = [...ssidAgg.values()].sort(
+      (a, b) => b.totalBytes + b.totalRxBytes - (a.totalBytes + a.totalRxBytes),
+    );
+
     const fromIso = new Date(q.from * 1000).toISOString().slice(0, 10);
     const toIso = new Date(q.to * 1000).toISOString().slice(0, 10);
     const filename = `mm-metricas_${fromIso}_${toIso}.pdf`;
@@ -327,6 +381,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       generatedAt: Date.now(),
       deviceSummary,
       totals,
+      ssidSummary,
     });
     await new Promise<void>((resolve, reject) => {
       pdf.on('end', resolve);
@@ -367,16 +422,22 @@ async function streamZip(
   const toIso = new Date(q.to * 1000).toISOString().slice(0, 10);
 
   for (const level of levels) {
-    const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
-    const header = CSV_HEADER_BY_LEVEL[level];
     // BOM no início para Excel abrir UTF-8 sem quebrar acentos.
-    const chunks: string[] = [UTF8_BOM, header];
-    const { rows } = queryMetrics(db, {
-      ...q,
-      groupBy: LEVEL_TO_GROUP_BY[level],
-      limit: 1_000_000,
-    });
-    for (const r of rows) chunks.push(builder(r, labels));
+    const chunks: string[] = [UTF8_BOM];
+    if (level === 'vap') {
+      chunks.push(VAP_CSV_HEADER);
+      const { rows } = queryVapMetrics(db, { ...q, limit: 1_000_000 });
+      for (const r of rows) chunks.push(vapRowToCsv(r, labels));
+    } else {
+      chunks.push(CSV_HEADER_BY_LEVEL[level]);
+      const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
+      const { rows } = queryMetrics(db, {
+        ...q,
+        groupBy: LEVEL_TO_GROUP_BY[level],
+        limit: 1_000_000,
+      });
+      for (const r of rows) chunks.push(builder(r, labels));
+    }
     const base = CSV_FILENAME_BY_LEVEL[level].replace(/\.csv$/, '');
     archive.append(chunks.join(''), { name: `${base}_${fromIso}_${toIso}.csv` });
   }

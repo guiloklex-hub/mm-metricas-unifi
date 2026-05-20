@@ -107,7 +107,8 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
 
   const selectLast = sqlite.prepare(
     `SELECT metric, last_value as lastValue FROM counter_state
-     WHERE controller_id = ? AND site_id = ? AND device_id = ? AND radio = ? AND client_mac = ?`,
+     WHERE controller_id = ? AND site_id = ? AND device_id = ? AND radio = ? AND client_mac = ?
+       AND ssid = ''`,
   );
 
   const upsertMetric = sqlite.prepare(
@@ -177,9 +178,9 @@ export function insertSamples5m(db: DB, samples: MetricSampleInput[]): InsertSam
 
   const upsertState = sqlite.prepare(
     `INSERT INTO counter_state (
-       controller_id, site_id, device_id, radio, client_mac, metric, last_value, last_ts
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(controller_id, site_id, device_id, radio, client_mac, metric) DO UPDATE SET
+       controller_id, site_id, device_id, radio, client_mac, ssid, metric, last_value, last_ts
+     ) VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)
+     ON CONFLICT(controller_id, site_id, device_id, radio, client_mac, ssid, metric) DO UPDATE SET
        last_value = excluded.last_value,
        last_ts = excluded.last_ts`,
   );
@@ -430,4 +431,138 @@ export function insertHistoricalSamples(
 
   tx(samples);
   return { inserted, skipped };
+}
+
+/* -------------------------- VAP (SSID × rádio) -------------------------- */
+
+export interface VapSampleInput {
+  ts: number;
+  controllerId: string;
+  siteId: string;
+  deviceId: string;
+  radio: 'ng' | 'na' | '6e';
+  ssid: string;
+  numSta: number | null;
+  isGuest: boolean | null;
+  avgClientSignal: number | null;
+  txBytes: number | null;
+  rxBytes: number | null;
+  macFilterRejections: number | null;
+}
+
+const VAP_METRIC_NAMES = ['vap:tx_bytes', 'vap:rx_bytes', 'vap:mac_filter_rejections'] as const;
+type VapMetricName = (typeof VAP_METRIC_NAMES)[number];
+
+function vapCounterValue(s: VapSampleInput, metric: VapMetricName): number | null {
+  switch (metric) {
+    case 'vap:tx_bytes':
+      return s.txBytes;
+    case 'vap:rx_bytes':
+      return s.rxBytes;
+    case 'vap:mac_filter_rejections':
+      return s.macFilterRejections;
+  }
+}
+
+/**
+ * Persistência de snapshots por VAP (SSID × rádio). Reusa `counter_state`
+ * com a coluna `ssid` para isolamento — métricas prefixadas por `vap:` para
+ * evitar colisão com counters do `metrics_*` principal.
+ */
+export function insertVapSamples5m(db: DB, samples: VapSampleInput[]): InsertSamplesResult {
+  if (samples.length === 0) return { inserted: 0, resetSignals: 0 };
+  const sqlite = db.$client;
+
+  const selectLast = sqlite.prepare(
+    `SELECT metric, last_value AS lastValue FROM counter_state
+     WHERE controller_id = ? AND site_id = ? AND device_id = ? AND radio = ?
+       AND client_mac = '' AND ssid = ?`,
+  );
+
+  const upsertVap = sqlite.prepare(
+    `INSERT INTO metrics_vap_5m (
+       ts, controller_id, site_id, device_id, radio, ssid,
+       num_sta, is_guest, avg_client_signal,
+       tx_bytes, rx_bytes, mac_filter_rejections,
+       d_tx_bytes, d_rx_bytes, d_mac_filter_rejections
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(ts, controller_id, site_id, device_id, radio, ssid) DO UPDATE SET
+       num_sta = excluded.num_sta,
+       is_guest = excluded.is_guest,
+       avg_client_signal = excluded.avg_client_signal,
+       tx_bytes = excluded.tx_bytes,
+       rx_bytes = excluded.rx_bytes,
+       mac_filter_rejections = excluded.mac_filter_rejections,
+       d_tx_bytes = excluded.d_tx_bytes,
+       d_rx_bytes = excluded.d_rx_bytes,
+       d_mac_filter_rejections = excluded.d_mac_filter_rejections`,
+  );
+
+  const upsertState = sqlite.prepare(
+    `INSERT INTO counter_state (
+       controller_id, site_id, device_id, radio, client_mac, ssid, metric, last_value, last_ts
+     ) VALUES (?, ?, ?, ?, '', ?, ?, ?, ?)
+     ON CONFLICT(controller_id, site_id, device_id, radio, client_mac, ssid, metric) DO UPDATE SET
+       last_value = excluded.last_value,
+       last_ts = excluded.last_ts`,
+  );
+
+  let inserted = 0;
+  let resetSignals = 0;
+
+  const tx = sqlite.transaction((items: VapSampleInput[]) => {
+    for (const s of items) {
+      const lastRows = selectLast.all(s.controllerId, s.siteId, s.deviceId, s.radio, s.ssid) as Array<{
+        metric: VapMetricName;
+        lastValue: number;
+      }>;
+      const last: Partial<Record<VapMetricName, number>> = {};
+      for (const r of lastRows) last[r.metric] = r.lastValue;
+
+      const dTxBytes = computeDelta(s.txBytes, last['vap:tx_bytes'] ?? null);
+      const dRxBytes = computeDelta(s.rxBytes, last['vap:rx_bytes'] ?? null);
+      const dMacFilterRejections = computeDelta(
+        s.macFilterRejections,
+        last['vap:mac_filter_rejections'] ?? null,
+      );
+
+      // Detecta reset: cur < prev em qualquer counter.
+      for (const m of VAP_METRIC_NAMES) {
+        const cur = vapCounterValue(s, m);
+        const prev = last[m];
+        if (cur != null && prev != null && cur < prev) {
+          resetSignals += 1;
+          break;
+        }
+      }
+
+      upsertVap.run(
+        s.ts,
+        s.controllerId,
+        s.siteId,
+        s.deviceId,
+        s.radio,
+        s.ssid,
+        s.numSta,
+        s.isGuest == null ? null : s.isGuest ? 1 : 0,
+        s.avgClientSignal,
+        s.txBytes,
+        s.rxBytes,
+        s.macFilterRejections,
+        dTxBytes,
+        dRxBytes,
+        dMacFilterRejections,
+      );
+      inserted += 1;
+
+      for (const metric of VAP_METRIC_NAMES) {
+        const v = vapCounterValue(s, metric);
+        if (v == null) continue;
+        upsertState.run(s.controllerId, s.siteId, s.deviceId, s.radio, s.ssid, metric, v, s.ts);
+      }
+    }
+  });
+
+  tx(samples);
+  return { inserted, resetSignals };
 }

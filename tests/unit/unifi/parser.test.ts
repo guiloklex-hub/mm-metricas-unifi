@@ -6,6 +6,7 @@ import {
   normalizeRadio,
   parseClientPayload,
   parseDevicePayload,
+  parseVapTable,
 } from '@server/unifi/parser.ts';
 import type { UnifiClientPayload, UnifiDevicePayload } from '@server/unifi/types.ts';
 import { describe, expect, it } from 'vitest';
@@ -307,6 +308,61 @@ describe('parseDevicePayload — fixture realista', () => {
     const r = parseDevicePayload(payload)!;
     const agg = r.samples.find((s) => s.radio === null)!;
     expect(agg.txBytes).toBeNull();
+  });
+});
+
+describe('parseVapTable', () => {
+  it('extrai 1 ParsedVapSample por VAP em RUN com essid válido', () => {
+    const payload: UnifiDevicePayload = {
+      mac: 'f4:92:bf:13:a9:58',
+      type: 'uap',
+      vap_table: [
+        {
+          essid: 'BL_AUT',
+          radio: 'na',
+          state: 'RUN',
+          num_sta: 5,
+          is_guest: false,
+          avg_client_signal: -60,
+          tx_bytes: 1_000_000,
+          rx_bytes: 500_000,
+          mac_filter_rejections: 0,
+        },
+        {
+          essid: 'GUEST',
+          radio: 'ng',
+          state: 'RUN',
+          num_sta: 12,
+          is_guest: true,
+          tx_bytes: 200_000,
+          rx_bytes: 50_000,
+        },
+        // Ignorados:
+        { essid: 'DISABLED', radio: 'na', state: 'DISABLED' }, // state ≠ RUN
+        { radio: 'na', state: 'RUN' }, // sem essid
+        { essid: 'BAD', state: 'RUN' }, // sem radio
+      ],
+    };
+    const samples = parseVapTable(payload);
+    expect(samples).toHaveLength(2);
+    expect(samples[0]).toMatchObject({
+      ssid: 'BL_AUT',
+      radio: 'na',
+      numSta: 5,
+      isGuest: false,
+      avgClientSignal: -60,
+    });
+    expect(samples[1]).toMatchObject({
+      ssid: 'GUEST',
+      radio: 'ng',
+      numSta: 12,
+      isGuest: true,
+    });
+  });
+
+  it('retorna [] quando vap_table está ausente ou device sem mac', () => {
+    expect(parseVapTable({ mac: 'aa:bb:cc:11:22:33', type: 'uap' })).toEqual([]);
+    expect(parseVapTable({ mac: undefined as unknown as string, type: 'uap' })).toEqual([]);
   });
 });
 

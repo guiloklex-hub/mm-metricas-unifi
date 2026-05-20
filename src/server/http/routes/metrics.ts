@@ -1,5 +1,5 @@
 import type { DB } from '@server/db/client.ts';
-import { queryMetrics } from '@server/db/queries/metrics-read.ts';
+import { queryMetrics, queryVapMetrics } from '@server/db/queries/metrics-read.ts';
 import { listTopTalkers } from '@server/db/queries/top-talkers.ts';
 import { metricsQuerySchema } from '@shared/schemas/metrics.ts';
 import type { FastifyInstance } from 'fastify';
@@ -97,5 +97,55 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
     const q = topTalkersSchema.parse(req.query);
     const rows = listTopTalkers(db, q);
     return { ok: true, data: { from: q.from, to: q.to, rows } };
+  });
+
+  /* ------------------------ VAP (SSID × rádio) ------------------------ */
+
+  const vapQuerySchema = z
+    .object({
+      from: z.coerce.number().int().positive(),
+      to: z.coerce.number().int().positive(),
+      granularity: z.enum(['5m', '1h', '1d']).optional(),
+      controllerId: z.string().min(1).max(64).optional(),
+      siteId: z.string().min(1).max(64).optional(),
+      deviceId: z.string().min(1).max(64).optional(),
+      radio: z.enum(['ng', 'na', '6e']).optional(),
+      ssid: z.string().min(1).max(64).optional(),
+    })
+    .refine((v) => v.to > v.from, 'to deve ser maior que from')
+    .refine((v) => v.to - v.from <= 366 * 86400, 'janela máxima de 1 ano');
+
+  app.get('/api/v1/metrics/vap', { preHandler: app.requireAdmin() }, async (req) => {
+    const q = vapQuerySchema.parse(req.query);
+    const { rows, granularity } = queryVapMetrics(db, q);
+    return {
+      ok: true,
+      data: { granularity, from: q.from, to: q.to, count: rows.length, rows },
+    };
+  });
+
+  // Variante "recente" para Dashboard — janela relativa, default 24h.
+  const vapRecentSchema = z.object({
+    seconds: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .max(7 * 86400)
+      .default(86400),
+    controllerId: z.string().min(1).max(64).optional(),
+    siteId: z.string().min(1).max(64).optional(),
+  });
+
+  app.get('/api/v1/metrics/vap/recent', { preHandler: app.requireAdmin() }, async (req) => {
+    const q = vapRecentSchema.parse(req.query);
+    const to = Math.floor(Date.now() / 1000);
+    const from = to - q.seconds;
+    const { rows, granularity } = queryVapMetrics(db, {
+      from,
+      to,
+      controllerId: q.controllerId,
+      siteId: q.siteId,
+    });
+    return { ok: true, data: { granularity, from, to, count: rows.length, rows } };
   });
 }

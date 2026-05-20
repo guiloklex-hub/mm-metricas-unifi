@@ -1,7 +1,12 @@
 import type { DB } from '@server/db/client.ts';
 import { markControllerError, markControllerSeen } from '@server/db/queries/controllers.ts';
 import { upsertDevice } from '@server/db/queries/devices.ts';
-import { insertSamples5m, type MetricSampleInput } from '@server/db/queries/metrics-write.ts';
+import {
+  insertSamples5m,
+  insertVapSamples5m,
+  type MetricSampleInput,
+  type VapSampleInput,
+} from '@server/db/queries/metrics-write.ts';
 import { listEnabledSitesByController, upsertSite } from '@server/db/queries/sites.ts';
 import type { UnifiClient } from '@server/unifi/client.ts';
 import {
@@ -9,6 +14,7 @@ import {
   type ParsedSample,
   parseClientPayload,
   parseDevicePayload,
+  parseVapTable,
 } from '@server/unifi/parser.ts';
 import { bucketTs, nowSeconds } from '@server/utils/time.ts';
 import type { Logger } from 'pino';
@@ -94,12 +100,27 @@ export async function runCollectJob(
 
   for (const site of enabledSites) {
     try {
-      const samples = await collectSite(client, payload.controllerId, site, bucket, db, log);
-      const { inserted, resetSignals } = insertSamples5m(db, samples);
+      const { metrics, vap } = await collectSite(
+        client,
+        payload.controllerId,
+        site,
+        bucket,
+        db,
+        log,
+      );
+      const metricsRes = insertSamples5m(db, metrics);
+      const vapRes = insertVapSamples5m(db, vap);
       result.sitesPolled += 1;
-      result.samplesInserted += inserted;
-      result.resetSignals += resetSignals;
-      log.debug({ site: site.unifiName, inserted, resetSignals }, 'site coletado');
+      result.samplesInserted += metricsRes.inserted + vapRes.inserted;
+      result.resetSignals += metricsRes.resetSignals + vapRes.resetSignals;
+      log.debug(
+        {
+          site: site.unifiName,
+          metricsInserted: metricsRes.inserted,
+          vapInserted: vapRes.inserted,
+        },
+        'site coletado',
+      );
     } catch (err) {
       const msg = errMsg(err);
       result.errors.push({ site: site.unifiName, message: msg });
@@ -141,7 +162,7 @@ async function collectSite(
   bucket: number,
   db: DB,
   log: Logger,
-): Promise<MetricSampleInput[]> {
+): Promise<{ metrics: MetricSampleInput[]; vap: VapSampleInput[] }> {
   const [devicesPayload, clientsPayload] = await Promise.all([
     client.fetchDevices(site.unifiName),
     client.fetchClients(site.unifiName),
@@ -193,11 +214,42 @@ async function collectSite(
     all.push(toMetricInput(parsed, controllerId, site.id, bucket, deviceId));
   }
 
+  // VAP (SSID × rádio): coleta paralela aos contadores principais. Mesmo
+  // bucket de timestamp; gravados em tabela separada `metrics_vap_5m`.
+  // parseVapTable normaliza o MAC do device para o formato canônico, então
+  // o lookup no macToDeviceId funciona consistente com parseDevicePayload.
+  const vap: VapSampleInput[] = [];
+  for (const raw of devicesPayload) {
+    for (const v of parseVapTable(raw)) {
+      const deviceId = macToDeviceId.get(v.deviceMac);
+      if (!deviceId) continue; // VAP de device que falhou no parseDevicePayload — pular
+      vap.push({
+        ts: bucket,
+        controllerId,
+        siteId: site.id,
+        deviceId,
+        radio: v.radio,
+        ssid: v.ssid,
+        numSta: v.numSta,
+        isGuest: v.isGuest,
+        avgClientSignal: v.avgClientSignal,
+        txBytes: v.txBytes,
+        rxBytes: v.rxBytes,
+        macFilterRejections: v.macFilterRejections,
+      });
+    }
+  }
+
   log.debug(
-    { devices: parsedDevices.length, clients: clientsPayload.length, samples: all.length },
+    {
+      devices: parsedDevices.length,
+      clients: clientsPayload.length,
+      vapSamples: vap.length,
+      samples: all.length,
+    },
     'coletado',
   );
-  return all;
+  return { metrics: all, vap };
 }
 
 function toMetricInput(
