@@ -42,7 +42,7 @@ Volumes:
 
 Portas:
 
-- `3000` — API + Web UI.
+- `3002` — API + Web UI.
 - `5432` — Postgres, **NÃO** exposto ao host por default (rede interna).
   Para inspecionar via `psql` em dev, use `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`.
 
@@ -55,7 +55,7 @@ local com `psql -U metricas_app -h 127.0.0.1 metricas_unifi`.
 
 ```caddyfile
 metricas.empresa.com {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3002
 }
 ```
 
@@ -71,7 +71,7 @@ server {
     ssl_certificate_key ...;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3002;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto https;
@@ -138,7 +138,7 @@ sudo journalctl -u metricas-unifi -f
 
 ## Primeiro acesso
 
-1. Acesse `http://<host>:3000`.
+1. Acesse `http://<host>:3002`.
 2. Setup wizard pede para definir senha do admin.
 3. Adicione o primeiro controller UniFi (URL, usuário, senha — ou API Key).
 4. Primeira coleta acontece em até 5 min; até lá, dashboard mostra estado "aguardando dados".

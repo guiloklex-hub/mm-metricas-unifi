@@ -46,7 +46,7 @@ echo "JWT_SECRET=$(openssl rand -base64 64)" >> .env
 docker compose up -d
 ```
 
-Acesse `http://localhost:3000` e siga o setup wizard para definir a senha de admin e cadastrar o primeiro controller.
+Acesse `http://localhost:3002` e siga o setup wizard para definir a senha de admin e cadastrar o primeiro controller.
 
 > **Postgres em host dedicado?** Veja
 > [docs/timescaledb-debian.md](docs/timescaledb-debian.md) para instalação,
@@ -64,9 +64,9 @@ cp .env.example .env
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up timescaledb -d
 
 npm run db:generate     # gera migrations Drizzle (apenas se mudou schema.ts)
-npm run dev             # API + scheduler em http://localhost:3000
+npm run dev             # API + scheduler em http://localhost:3002
                         # (migrations aplicadas automaticamente no boot)
-npm run dev:web         # Vite SPA em http://localhost:5173 (proxy para 3000)
+npm run dev:web         # Vite SPA em http://localhost:5173 (proxy para 3002)
 ```
 
 ### Scripts
@@ -128,13 +128,13 @@ API equivalente:
 
 ```bash
 # disparar backfill (precisa de sessão admin)
-curl -X POST http://localhost:3000/api/v1/controllers/{controllerId}/backfill \
+curl -X POST http://localhost:3002/api/v1/controllers/{controllerId}/backfill \
   -H 'content-type: application/json' \
   -b cookies.txt \
   -d '{"days": 30, "includeDaily": false}'
 
 # consultar status
-curl http://localhost:3000/api/v1/controllers/{controllerId}/backfill/status -b cookies.txt
+curl http://localhost:3002/api/v1/controllers/{controllerId}/backfill/status -b cookies.txt
 ```
 
 ## Documentação

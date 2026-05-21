@@ -33,11 +33,11 @@ services:
       timescaledb:
         condition: service_healthy
     ports:
-      - '3000:3000'
+      - '3002:3002'
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: 3002
       DATABASE_URL: postgresql://metricas_app:${POSTGRES_PASSWORD}@timescaledb:5432/metricas_unifi
       LOG_LEVEL: info
       MASTER_KEY: ${MASTER_KEY:?Defina MASTER_KEY no .env (openssl rand -base64 32)}
@@ -49,7 +49,7 @@ services:
       # Diretório para PDFs gerados pelo /api/v1/reports/pdf.
       - ./data:/app/data:Z
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3002/healthz']
       interval: 30s
       timeout: 5s
       retries: 3

@@ -39,7 +39,7 @@ a camada de persistência.
 - **Sistema**: Debian 12 bookworm com `sudo` configurado e usuário não-root.
 - **Sincronização de horário**: `chrony` ou `systemd-timesyncd` ativo. Séries
   temporais sensíveis a drift de relógio.
-- **Locale**: `en_US.UTF-8` ou `pt_BR.UTF-8` (gerado via `dpkg-reconfigure
+- **Locale**: `C.UTF-8` ou `C.UTF-8` (gerado via `dpkg-reconfigure
   locales`). Necessário para `LC_COLLATE` do banco.
 - **Recursos mínimos sugeridos** (por porte):
 
@@ -65,7 +65,7 @@ Cenário A — tudo no mesmo host (1–10 controllers)
     │                                       │
     │   ┌────────────┐    ┌──────────────┐ │
     │   │  app Node  │───▶│  Postgres 16 │ │
-    │   │  :3000     │    │  +Timescale  │ │
+    │   │  :3002     │    │  +Timescale  │ │
     │   └────────────┘    └──────────────┘ │
     │      ▲  socket Unix em /var/run/postgresql
     │      │
@@ -78,7 +78,7 @@ Cenário B — DB em host dedicado (10+ controllers, HA)
 
     ┌─────────────┐                  ┌─────────────────────┐
     │  app host   │   TCP + TLS      │   Postgres host     │
-    │  Node :3000 │ ─────────────▶   │   :5432 (firewall)  │
+    │  Node :3002 │ ─────────────▶   │   :5432 (firewall)  │
     └─────────────┘  sslmode=        └─────────────────────┘
                      verify-full
 ```
@@ -238,8 +238,8 @@ CREATE ROLE metricas_app LOGIN
 CREATE DATABASE metricas_unifi
   OWNER metricas_app
   ENCODING 'UTF8'
-  LC_COLLATE 'en_US.UTF-8'
-  LC_CTYPE   'en_US.UTF-8'
+  LC_COLLATE 'C.UTF-8'
+  LC_CTYPE   'C.UTF-8'
   TEMPLATE   template0;
 
 -- Reduz permissões padrão de PUBLIC para evitar exposição acidental.

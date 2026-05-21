@@ -38,7 +38,7 @@ LABEL org.opencontainers.image.source="https://github.com/guiloklex-hub/metricas
 # Veja docker-compose.yml ou docs/timescaledb-debian.md.
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000
+    PORT=3002
 
 WORKDIR /app
 
@@ -55,7 +55,7 @@ COPY --from=builder --chown=app:app /app/package.json ./package.json
 
 USER app
 
-EXPOSE 3000
+EXPOSE 3002
 
 # `/app/data` agora guarda apenas relatórios PDF gerados sob demanda.
 # Os dados de série temporal vivem no PostgreSQL (volume separado).
