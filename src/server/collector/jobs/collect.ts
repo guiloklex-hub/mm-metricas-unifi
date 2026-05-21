@@ -1,6 +1,6 @@
 import type { DB } from '@server/db/client.ts';
-import { markControllerError, markControllerSeen } from '@server/db/queries/controllers.ts';
 import { upsertClient } from '@server/db/queries/clients.ts';
+import { markControllerError, markControllerSeen } from '@server/db/queries/controllers.ts';
 import { upsertDevice } from '@server/db/queries/devices.ts';
 import {
   type ClientSampleInput,
@@ -194,15 +194,36 @@ async function collectSite(
   clients: ClientSampleInput[];
   events: EventInput[];
 }> {
-  // Eventos vêm best-effort: se falhar não derruba a coleta principal.
-  const [devicesPayload, clientsPayload, eventsPayload] = await Promise.all([
+  // Cada fetch é isolado via allSettled — falha em um não derruba os outros.
+  // Cenário típico: controller lento responde devices mas estoura timeout em
+  // events, ou vice-versa. Antes (Promise.all) qualquer rejeição perdia tudo
+  // do bucket; agora salvamos o que conseguiu chegar.
+  const [devicesResult, clientsResult, eventsResult] = await Promise.allSettled([
     client.fetchDevices(site.unifiName),
     client.fetchClients(site.unifiName),
-    client.fetchEvents(site.unifiName, 200).catch((err) => {
-      log.warn({ err: errMsg(err), site: site.unifiName }, 'fetchEvents falhou');
-      return [] as Awaited<ReturnType<UnifiClient['fetchEvents']>>;
-    }),
+    client.fetchEvents(site.unifiName, 200),
   ]);
+
+  if (devicesResult.status === 'rejected') {
+    log.warn({ err: errMsg(devicesResult.reason), site: site.unifiName }, 'fetchDevices falhou');
+  }
+  if (clientsResult.status === 'rejected') {
+    log.warn({ err: errMsg(clientsResult.reason), site: site.unifiName }, 'fetchClients falhou');
+  }
+  if (eventsResult.status === 'rejected') {
+    log.warn({ err: errMsg(eventsResult.reason), site: site.unifiName }, 'fetchEvents falhou');
+  }
+
+  // Se devices E clients falharam, não há nada útil para salvar — propaga o
+  // erro para o caller marcar este site como falho (alimenta `result.errors`
+  // em runCollectJob, que pode marcar controller em erro se todos sites caem).
+  if (devicesResult.status === 'rejected' && clientsResult.status === 'rejected') {
+    throw new Error(`fetchDevices e fetchClients falharam: ${errMsg(devicesResult.reason)}`);
+  }
+
+  const devicesPayload = devicesResult.status === 'fulfilled' ? devicesResult.value : [];
+  const clientsPayload = clientsResult.status === 'fulfilled' ? clientsResult.value : [];
+  const eventsPayload = eventsResult.status === 'fulfilled' ? eventsResult.value : [];
 
   const parsedDevices = devicesPayload
     .map((d) => parseDevicePayload(d))
@@ -256,8 +277,7 @@ async function collectSite(
           controllerId,
           siteId: site.id,
           mac: parsed.clientMac,
-          hostname:
-            typeof c.hostname === 'string' && c.hostname.trim() ? c.hostname.trim() : null,
+          hostname: typeof c.hostname === 'string' && c.hostname.trim() ? c.hostname.trim() : null,
           name: typeof c.name === 'string' && c.name.trim() ? c.name.trim() : null,
           seenAt,
         });

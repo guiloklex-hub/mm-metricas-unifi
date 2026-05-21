@@ -18,7 +18,12 @@ const changePasswordSchema = z.object({
 
 export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/auth/setup-status', async () => {
-    const row = await db.select().from(appConfig).where(eq(appConfig.key, SETUP_KEY)).limit(1).then((r) => r[0]);
+    const row = await db
+      .select()
+      .from(appConfig)
+      .where(eq(appConfig.key, SETUP_KEY))
+      .limit(1)
+      .then((r) => r[0]);
     return { ok: true, data: { complete: row?.value === 'true' } };
   });
 
@@ -28,7 +33,12 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
       config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
     },
     async (req, reply) => {
-      const setupRow = await db.select().from(appConfig).where(eq(appConfig.key, SETUP_KEY)).limit(1).then((r) => r[0]);
+      const setupRow = await db
+        .select()
+        .from(appConfig)
+        .where(eq(appConfig.key, SETUP_KEY))
+        .limit(1)
+        .then((r) => r[0]);
       if (setupRow?.value === 'true') {
         return reply.code(409).send({ ok: false, error: 'setup_already_complete' });
       }
@@ -56,7 +66,12 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
     },
     async (req, reply) => {
       const input = loginInputSchema.parse(req.body);
-      const row = await db.select().from(appConfig).where(eq(appConfig.key, PASSWORD_KEY)).limit(1).then((r) => r[0]);
+      const row = await db
+        .select()
+        .from(appConfig)
+        .where(eq(appConfig.key, PASSWORD_KEY))
+        .limit(1)
+        .then((r) => r[0]);
       if (!row) {
         return reply.code(409).send({ ok: false, error: 'setup_required' });
       }
@@ -95,7 +110,12 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
     { preHandler: app.requireAdmin() },
     async (req, reply) => {
       const input = changePasswordSchema.parse(req.body);
-      const row = await db.select().from(appConfig).where(eq(appConfig.key, PASSWORD_KEY)).limit(1).then((r) => r[0]);
+      const row = await db
+        .select()
+        .from(appConfig)
+        .where(eq(appConfig.key, PASSWORD_KEY))
+        .limit(1)
+        .then((r) => r[0]);
       if (!row) {
         return reply.code(409).send({ ok: false, error: 'setup_required' });
       }

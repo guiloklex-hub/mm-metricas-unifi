@@ -147,10 +147,7 @@ describe('insertHistoricalSamples', () => {
       historicalSample(1_700_000_000, 1000, 5, DEVICE),
       historicalSample(1_700_000_300, 2000, 6, DEVICE),
     ]);
-    const count = await rawGet<{ c: number }>(
-      db,
-      'SELECT COUNT(*)::int AS c FROM counter_state',
-    );
+    const count = await rawGet<{ c: number }>(db, 'SELECT COUNT(*)::int AS c FROM counter_state');
     expect(count?.c).toBe(0);
   });
 

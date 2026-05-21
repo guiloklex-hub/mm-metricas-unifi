@@ -95,6 +95,7 @@ Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 - `POSTGRES_PASSWORD` — usado pelo docker-compose para criar o role `metricas_app` no Postgres e referenciado em `DATABASE_URL`.
 - `MASTER_KEY` — 32 bytes em base64. Cifra credenciais dos controllers no banco. Trocar invalida senhas guardadas.
 - `JWT_SECRET` — segredo para assinar sessões.
+- `COLLECTOR_WORKERS` (opcional, default `1`) — workers paralelos da fila de jobs. Subir para `3`–`5` se você tem 10+ controllers, especialmente se algum tem timeout intermitente (com 1 worker, falha de 10s em um controller atrasa os demais). Workers compartilham a fila via `FOR UPDATE SKIP LOCKED`, sem duplicar jobs.
 
 > **Bare metal:** `npm run start` não carrega `.env` sozinho. Suba via `systemd`
 > (`EnvironmentFile=`) ou via PM2 com o [`ecosystem.config.cjs`](ecosystem.config.cjs)

@@ -526,10 +526,11 @@ export async function insertVapSamples5m(
 
   await withTransaction(db, async (tx) => {
     for (const s of samples) {
-      const lastRows = await tx.all<{ metric: VapMetricName; lastvalue: number; lastValue: number }>(
-        SELECT_LAST_VAP,
-        [s.controllerId, s.siteId, s.deviceId, s.radio, s.ssid],
-      );
+      const lastRows = await tx.all<{
+        metric: VapMetricName;
+        lastvalue: number;
+        lastValue: number;
+      }>(SELECT_LAST_VAP, [s.controllerId, s.siteId, s.deviceId, s.radio, s.ssid]);
       const last: Partial<Record<VapMetricName, number>> = {};
       for (const r of lastRows) {
         const val = r.lastValue ?? r.lastvalue;

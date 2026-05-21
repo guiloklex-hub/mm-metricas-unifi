@@ -14,7 +14,10 @@
  *
  * Notas:
  *   - `instances: 1` é obrigatório. O collector e os cronjobs (croner) não
- *     suportam múltiplas réplicas — cluster mode causa coleta duplicada.
+ *     suportam múltiplas réplicas de processo — cluster mode causa coleta
+ *     duplicada. Para paralelizar a coleta entre controllers, ajuste
+ *     `COLLECTOR_WORKERS=N` no `.env` (workers internos compartilham a fila
+ *     via `FOR UPDATE SKIP LOCKED`, sem duplicação).
  *   - `--env-file=.env` é resolvido relativo ao `cwd`.
  *   - `--import tsx` habilita TypeScript em runtime sem build de servidor.
  */

@@ -15,6 +15,11 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 - Cenário híbrido em [docs/timescaledb-debian.md §7](docs/timescaledb-debian.md#7-configurar-pg_hbaconf-autenticação)
   (`host` para `127.0.0.1`/`::1`) — útil para app + banco no mesmo servidor
   conectando via TCP loopback sem TLS.
+- Env `COLLECTOR_WORKERS` (default `1`, max `16`): workers internos que
+  processam a fila em paralelo. Compartilham o claim atômico (`FOR UPDATE
+  SKIP LOCKED`), sem duplicar jobs. Recomendado subir para 3–5 quando há
+  10+ controllers ou alguns com timeout intermitente — evita que uma
+  falha de 10s atrase os demais.
 
 ### Fixed
 
@@ -26,6 +31,33 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
   `npm run start` direto **não carrega** `.env` (não há `dotenv` embutido).
   Recomendações: `systemd` com `EnvironmentFile=`, PM2 com `--env-file=.env`,
   ou `set -a; source .env; set +a` no shell.
+- **Rollup horário (`rollup_1h`) caía com `function max(boolean) does not
+  exist`.** Resíduo da migração SQLite→Postgres: `is_guest`/`is_wired`
+  viraram `boolean` real, mas o SQL do rollup ainda usava `MAX(...)`.
+  Trocado por `bool_or(...)` em
+  [src/server/db/queries/rollup.ts](src/server/db/queries/rollup.ts)
+  (3 ocorrências — VAP 1h, Client 1h).
+- **Reagendamento de job em retry quebrava com `invalid input syntax for
+  type bigint: "...7053"`.** O `expBackoff` aplicava jitter `Math.random()`
+  e o resultado float era somado a `Date.now()` na coluna BIGINT `run_at`.
+  Agora retorna `Math.floor(...)` em
+  [src/server/collector/queue.ts](src/server/collector/queue.ts). Sem o
+  fix, qualquer job que falhasse não conseguia reentrar na fila.
+- **Cliente "sumia" ao filtrar por controller** em
+  `listClientCoverage` / `clientCoverageHistogram` quando o mesmo MAC
+  aparecia em mais de um controller. O CTE `last_ts` agrupava só por
+  `client_mac`; corrigido para `(controller_id, site_id, client_mac)` em
+  [src/server/db/queries/health.ts](src/server/db/queries/health.ts).
+  Coerente com o índice único de `metrics_client_5m`.
+
+### Changed
+
+- `collectSite` agora usa `Promise.allSettled` por endpoint (devices /
+  clients / events) em vez de `Promise.all`. Falha em events não derruba
+  devices/clients, e vice-versa. Site só é marcado em erro quando devices
+  E clients ambos falham. Reduz perda de buckets em controllers com
+  conectividade instável.
+  ([src/server/collector/jobs/collect.ts](src/server/collector/jobs/collect.ts))
 
 ### Documentation
 

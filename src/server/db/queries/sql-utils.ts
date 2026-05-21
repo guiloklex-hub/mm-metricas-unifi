@@ -1,5 +1,5 @@
-import type { QueryResultRow } from 'pg';
 import type { DB } from '@server/db/client.ts';
+import type { QueryResultRow } from 'pg';
 
 /**
  * Converte placeholders `?` (estilo SQLite) em `$1, $2, ...` (estilo Postgres),

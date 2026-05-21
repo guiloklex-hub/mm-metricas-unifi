@@ -157,11 +157,9 @@ describe('rollup1hTo1d', () => {
       d_tx_bytes: number;
       d_tx_packets: number;
       d_tx_retries: number;
-    }>(
-      db,
-      `SELECT d_tx_bytes, d_tx_packets, d_tx_retries FROM metrics_1d WHERE ts = ?`,
-      [dayStart],
-    );
+    }>(db, `SELECT d_tx_bytes, d_tx_packets, d_tx_retries FROM metrics_1d WHERE ts = ?`, [
+      dayStart,
+    ]);
     expect(row?.d_tx_bytes).toBe(100 * 24);
     expect(row?.d_tx_packets).toBe(10 * 24);
     expect(row?.d_tx_retries).toBe(24);
@@ -185,10 +183,7 @@ describe('purgeOlderThan', () => {
     const threshold = now - 30 * 86400;
     const removed = await purgeOlderThan(db, 'metrics_5m', threshold);
     expect(removed).toBe(1);
-    const remaining = await rawGet<{ c: number }>(
-      db,
-      'SELECT COUNT(*)::int AS c FROM metrics_5m',
-    );
+    const remaining = await rawGet<{ c: number }>(db, 'SELECT COUNT(*)::int AS c FROM metrics_5m');
     expect(remaining?.c).toBe(2);
   });
 

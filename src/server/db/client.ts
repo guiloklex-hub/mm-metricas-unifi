@@ -25,7 +25,11 @@ export interface CreateDbOptions {
   idleTimeoutMs?: number;
 }
 
-export function createDb({ url, maxConnections = 10, idleTimeoutMs = 30_000 }: CreateDbOptions): DB {
+export function createDb({
+  url,
+  maxConnections = 10,
+  idleTimeoutMs = 30_000,
+}: CreateDbOptions): DB {
   const pool = new pg.Pool({
     connectionString: url,
     max: maxConnections,

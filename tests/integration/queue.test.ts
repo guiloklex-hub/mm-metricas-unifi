@@ -100,6 +100,24 @@ describe('JobQueue', () => {
     expect(counts.pending).toBe(0);
   });
 
+  it('markFailed sem retryDelay produz run_at inteiro (BIGINT do Postgres não aceita float)', async () => {
+    // Regressão: o expBackoff aplica jitter via Math.random(), que retorna float.
+    // Sem Math.floor, `now + delay` virava float e o Postgres rejeitava com
+    // `invalid input syntax for type bigint: "...7053"`, deixando o reagendamento
+    // permanentemente quebrado e qualquer job que falhasse parava de retentar.
+    await queue.enqueue('collect', null, undefined, { maxAttempts: 5 });
+    const job = (await queue.claimNext())!;
+    await queue.markFailed(job.id, 'erro transiente'); // sem retryDelayMs → usa expBackoff
+    const rows = await rawAll<{ runAt: number }>(db, 'SELECT run_at AS "runAt" FROM jobs');
+    expect(rows).toHaveLength(1);
+    // run_at é BIGINT — driver `pg` coerce para number via parseInt (ver
+    // db/client.ts). Sem o `Math.floor` no expBackoff, o INSERT estouraria
+    // com `invalid input syntax for type bigint` antes de chegar aqui.
+    const runAt = rows[0]?.runAt;
+    expect(typeof runAt).toBe('number');
+    expect(Number.isInteger(runAt)).toBe(true);
+  });
+
   it('locked_until expirado libera o job para outro claim', async () => {
     await queue.enqueue('collect', null);
     // claim com TTL negativo — equivale a já expirado.

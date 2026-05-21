@@ -216,7 +216,7 @@ function buildVapRollupSql(opts: {
       (ts / ${opts.bucketSeconds}) * ${opts.bucketSeconds} AS bucket_ts,
       controller_id, site_id, device_id, radio, ssid,
       MAX(num_sta) AS num_sta, -- pico de clientes na janela
-      MAX(is_guest) AS is_guest,
+      bool_or(is_guest) AS is_guest,
       AVG(avg_client_signal) AS avg_client_signal,
       MAX(tx_bytes) AS tx_bytes,
       MAX(rx_bytes) AS rx_bytes,
@@ -276,20 +276,12 @@ const SQL_VAP_1H_TO_1D = buildVapRollupSql({
   bucketSeconds: BUCKET_1D_SECONDS,
 });
 
-export async function rollupVap5mTo1h(
-  db: DB,
-  fromTs: number,
-  toTs: number,
-): Promise<RollupResult> {
+export async function rollupVap5mTo1h(db: DB, fromTs: number, toTs: number): Promise<RollupResult> {
   const res = await rawRun(db, SQL_VAP_5M_TO_1H, [fromTs, toTs]);
   return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
-export async function rollupVap1hTo1d(
-  db: DB,
-  fromTs: number,
-  toTs: number,
-): Promise<RollupResult> {
+export async function rollupVap1hTo1d(db: DB, fromTs: number, toTs: number): Promise<RollupResult> {
   const res = await rawRun(db, SQL_VAP_1H_TO_1D, [fromTs, toTs]);
   return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
@@ -500,8 +492,8 @@ const SQL_CLIENT_5M_TO_1H = `
     AVG(rx_rate_kbps) AS rx_rate_kbps,
     MIN(idle_time) AS idle_time,
     MAX(roam_count) AS roam_count,
-    MAX(is_guest) AS is_guest,
-    MAX(is_wired) AS is_wired,
+    bool_or(is_guest) AS is_guest,
+    bool_or(is_wired) AS is_wired,
     MAX(uptime_sec) AS uptime_sec,
     MAX(tx_bytes) AS tx_bytes,
     MAX(rx_bytes) AS rx_bytes,

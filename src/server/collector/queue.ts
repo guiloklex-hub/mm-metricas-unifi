@@ -242,5 +242,8 @@ function expBackoff(attempt: number): number {
   const base = 30_000;
   const max = 30 * 60_000;
   const ms = base * 2 ** Math.max(0, attempt - 1);
-  return Math.min(max, ms) * (0.5 + Math.random() * 0.5);
+  // O jitter (Math.random()) introduz fração — arredondamos para baixo para
+  // manter `run_at` inteiro (a coluna é BIGINT no Postgres; sem floor o
+  // reagendamento falha com `invalid input syntax for type bigint`).
+  return Math.floor(Math.min(max, ms) * (0.5 + Math.random() * 0.5));
 }

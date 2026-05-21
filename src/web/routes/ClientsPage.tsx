@@ -238,8 +238,8 @@ function ImportCsvCard({ controllerId, onDone }: ImportCsvCardProps) {
       <div className="space-y-3 text-sm">
         <p className="text-slate-600 dark:text-slate-300">
           Cabeçalho opcional <code>mac,alias</code>. Linhas que começam com <code>#</code> são
-          ignoradas. Aliases até 120 caracteres. MAC pode estar com <code>:</code> ou{' '}
-          <code>-</code>. Limite de 50.000 linhas por import.
+          ignoradas. Aliases até 120 caracteres. MAC pode estar com <code>:</code> ou <code>-</code>
+          . Limite de 50.000 linhas por import.
         </p>
         <Input
           type="file"
@@ -292,8 +292,7 @@ function ImportCsvCard({ controllerId, onDone }: ImportCsvCardProps) {
         {result && (
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-950">
             <p>
-              <b>{result.updated}</b> apelidos aplicados · <b>{result.skipped}</b> linhas
-              ignoradas
+              <b>{result.updated}</b> apelidos aplicados · <b>{result.skipped}</b> linhas ignoradas
             </p>
             {result.errors.length > 0 && (
               <details className="mt-2">

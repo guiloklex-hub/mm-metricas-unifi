@@ -186,8 +186,7 @@ export function DashboardPage() {
                                 name: t.name,
                                 hostname: t.hostname,
                                 mac: t.clientMac,
-                              })
-                                .replace(/ \([^)]+\)$/, '')}
+                              }).replace(/ \([^)]+\)$/, '')}
                             </span>
                             <span className="ml-2 font-mono text-xs text-slate-500">
                               {t.clientMac}

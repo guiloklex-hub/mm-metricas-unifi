@@ -1,6 +1,6 @@
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createDb, type DB } from '@server/db/client.ts';
 import { runBootstrapSql, runMigrations } from '@server/db/migrate.ts';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 
 /**
  * Cria um Postgres+TimescaleDB efêmero via testcontainers para suítes de teste.

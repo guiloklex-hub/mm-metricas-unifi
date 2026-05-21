@@ -239,11 +239,15 @@ export async function listClientCoverage(
   params.push(limit);
   return rawAll<ClientCoverageRow>(
     db,
+    // CTE agrupa por (controller_id, site_id, client_mac) — sem isso, um mesmo
+    // MAC presente em controllers diferentes derrubaria a linha do controller
+    // com `ts` mais antigo após o JOIN (cliente "some" no filtro). Confere
+    // com o índice único de `metrics_client_5m` em schema.ts.
     `WITH last_ts AS (
-       SELECT client_mac, MAX(ts) AS ts
+       SELECT controller_id, site_id, client_mac, MAX(ts) AS ts
        FROM metrics_client_5m
        WHERE ts >= ?
-       GROUP BY client_mac
+       GROUP BY controller_id, site_id, client_mac
      )
      SELECT c.client_mac AS clientMac,
             CASE WHEN c.ap_device_id = '' THEN NULL ELSE c.ap_device_id END AS apDeviceId,
@@ -263,7 +267,11 @@ export async function listClientCoverage(
             c.is_guest AS isGuest,
             c.ts AS ts
      FROM metrics_client_5m c
-     JOIN last_ts l ON l.client_mac = c.client_mac AND l.ts = c.ts
+     JOIN last_ts l
+       ON l.controller_id = c.controller_id
+      AND l.site_id      = c.site_id
+      AND l.client_mac   = c.client_mac
+      AND l.ts           = c.ts
      LEFT JOIN devices d ON d.id = c.ap_device_id
      WHERE 1=1 ${where}
      ORDER BY c.signal ASC NULLS LAST
@@ -289,13 +297,15 @@ export async function clientCoverageHistogram(
   }
   const where = filters.length > 0 ? `AND ${filters.join(' AND ')}` : '';
   // Bins de 5 dBm de -30 a -95. Cliente sem signal vai para -100.
+  // CTE precisa agrupar por (controller_id, site_id, client_mac) — sem isso,
+  // um MAC presente em controllers diferentes seria contado uma vez só.
   return rawAll<{ bin: number; count: number }>(
     db,
     `WITH last_ts AS (
-       SELECT client_mac, MAX(ts) AS ts
+       SELECT controller_id, site_id, client_mac, MAX(ts) AS ts
        FROM metrics_client_5m
        WHERE ts >= ? ${where}
-       GROUP BY client_mac
+       GROUP BY controller_id, site_id, client_mac
      )
      SELECT
        CASE
@@ -306,7 +316,11 @@ export async function clientCoverageHistogram(
        END AS bin,
        COUNT(*)::int AS count
      FROM metrics_client_5m c
-     JOIN last_ts l ON l.client_mac = c.client_mac AND l.ts = c.ts
+     JOIN last_ts l
+       ON l.controller_id = c.controller_id
+      AND l.site_id      = c.site_id
+      AND l.client_mac   = c.client_mac
+      AND l.ts           = c.ts
      GROUP BY bin
      ORDER BY bin DESC`,
     params,

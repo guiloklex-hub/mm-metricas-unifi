@@ -62,6 +62,10 @@ Pattern: tabela `jobs (id, kind, run_at, payload_json, status, attempts, locked_
 
 Retries com backoff exponencial. Idempotência via UPSERT (`INSERT ... ON CONFLICT DO UPDATE`) nas tabelas de métricas (re-execução de job parcial não duplica linhas).
 
+**Concorrência configurável.** A env `COLLECTOR_WORKERS` (default `1`) controla quantos workers do mesmo processo participam do `claimNext`. Workers compartilham a fila — `SKIP LOCKED` garante que cada job é entregue a um worker só. Útil quando há 10+ controllers e algum tem timeout intermitente: com 1 worker, uma falha de 10s atrasa todos os outros controllers do tick; com 3-5 workers, os controllers saudáveis seguem.
+
+`collectSite` usa `Promise.allSettled` por endpoint (devices / clients / events) — falha em events não derruba devices, e vice-versa. Site só vai para erro quando devices E clients ambos falham.
+
 ### UnifiClient
 
 Generaliza o padrão de `unifi-captiveportal/src/lib/unifi.ts` (login mutex, CSRF rotativo, circuit breaker, detecção OS-vs-Classic) para **multi-controller**: cache `Map<controllerId, UnifiClient>` com instâncias isoladas (cookie jar próprio, agente undici próprio com cert config opcional).

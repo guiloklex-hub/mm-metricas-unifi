@@ -6,10 +6,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3002),
   DATABASE_URL: z
     .string()
-    .regex(
-      /^postgres(ql)?:\/\//,
-      'DATABASE_URL deve iniciar com `postgres://` ou `postgresql://`',
-    )
+    .regex(/^postgres(ql)?:\/\//, 'DATABASE_URL deve iniciar com `postgres://` ou `postgresql://`')
     .default('postgresql://localhost:5432/metricas_unifi'),
   MASTER_KEY: z
     .string()
@@ -28,6 +25,14 @@ const envSchema = z.object({
   DEFAULT_POLL_SECONDS: z.coerce.number().int().min(60).max(3600).default(300),
   RETENTION_5M_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   RETENTION_1H_DAYS: z.coerce.number().int().min(7).max(3650).default(365),
+  /**
+   * Quantos workers processam a fila de jobs em paralelo. Cada worker é um
+   * loop independente que usa `FOR UPDATE SKIP LOCKED` no claim, então N
+   * workers não duplicam jobs. Default 1 (compatibilidade); aumente para
+   * 3–5 se você tem 10+ controllers com timeouts intermitentes que
+   * cumulativamente atrasam o tick de coleta.
+   */
+  COLLECTOR_WORKERS: z.coerce.number().int().min(1).max(16).default(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

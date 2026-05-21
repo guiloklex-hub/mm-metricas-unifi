@@ -13,6 +13,14 @@ export interface MockUnifiOptions {
   variant?: 'unifi-os' | 'classic';
   /** Para simular reboot: muda `tx_bytes` para um valor menor. */
   rebootSimulation?: boolean;
+  /**
+   * Falhas controladas por endpoint — útil para testar resiliência do
+   * `collectSite` (Promise.allSettled). Default = nenhuma; quando setado,
+   * o endpoint responde HTTP 500 ao invés do payload normal.
+   */
+  failDevices?: boolean;
+  failClients?: boolean;
+  failEvents?: boolean;
 }
 
 export interface MockUnifiServer {
@@ -87,6 +95,11 @@ export async function startMockUnifiServer(opts: MockUnifiOptions = {}): Promise
 
     const deviceMatch = url.match(new RegExp(`^${escapeRegex(prefix)}/s/([^/]+)/stat/device$`));
     if (req.method === 'GET' && deviceMatch) {
+      if (opts.failDevices) {
+        res.statusCode = 500;
+        res.end('{"meta":{"rc":"error","msg":"server.err.internal"}}');
+        return;
+      }
       res.statusCode = 200;
       res.end(devices);
       return;
@@ -94,8 +107,28 @@ export async function startMockUnifiServer(opts: MockUnifiOptions = {}): Promise
 
     const staMatch = url.match(new RegExp(`^${escapeRegex(prefix)}/s/([^/]+)/stat/sta$`));
     if (req.method === 'GET' && staMatch) {
+      if (opts.failClients) {
+        res.statusCode = 500;
+        res.end('{"meta":{"rc":"error","msg":"server.err.internal"}}');
+        return;
+      }
       res.statusCode = 200;
       res.end(clients);
+      return;
+    }
+
+    // Eventos (fetchEvents bate em /stat/event?_sort=-time&_limit=N).
+    const eventMatch = url.match(
+      new RegExp(`^${escapeRegex(prefix)}/s/([^/]+)/stat/event(?:\\?.*)?$`),
+    );
+    if (req.method === 'GET' && eventMatch) {
+      if (opts.failEvents) {
+        res.statusCode = 500;
+        res.end('{"meta":{"rc":"error","msg":"server.err.internal"}}');
+        return;
+      }
+      res.statusCode = 200;
+      res.end('{"meta":{"rc":"ok"},"data":[]}');
       return;
     }
 

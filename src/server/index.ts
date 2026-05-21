@@ -30,6 +30,7 @@ async function main(): Promise<void> {
     masterKey: env.MASTER_KEY,
     retention5mDays: env.RETENTION_5M_DAYS,
     retention1hDays: env.RETENTION_1H_DAYS,
+    workers: env.COLLECTOR_WORKERS,
   });
   await startCollector(collector);
 
