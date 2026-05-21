@@ -94,8 +94,11 @@ cd metricas-unifi
 
 # Build precisa das devDependencies (vite, tailwind, plugins). Instale tudo,
 # builde o front-end e só então pode dropar dev deps.
-npm ci
-npm run build
+#
+# ATENÇÃO em redeploy: se `NODE_ENV=production` já está exportado no shell
+# (caso típico depois de `source .env`), o npm pula devDeps automaticamente
+# e o build falha com `sh: 1: vite: not found`. Rode numa subshell limpa:
+( unset NODE_ENV; npm ci && npm run build )
 npm prune --omit=dev   # opcional: reduz node_modules após o build
 
 # Configure .env (DATABASE_URL aponta para o Postgres do passo anterior;
@@ -252,7 +255,7 @@ Migrations Drizzle rodam automaticamente no boot. Bootstrap do Timescale
 |---|---|---|
 | Container `metricas-unifi` reinicia em loop | `MASTER_KEY`/`JWT_SECRET`/`POSTGRES_PASSWORD` vazios | Setar no `.env`. |
 | `Configuração inválida em variáveis de ambiente: MASTER_KEY/JWT_SECRET: Required` rodando bare metal à mão | `npm run start` direto **não carrega `.env`** (não há dotenv embutido) | Use `set -a; source .env; set +a; npm run start`, ou `node --env-file=.env --import tsx src/server/index.ts`, ou suba via systemd / PM2 (que carregam o `.env`). |
-| `sh: 1: vite: not found` no `npm run build` em bare metal | Instalou só com `--omit=dev`; `vite` é dev-dependency | Rode `npm ci` (sem `--omit=dev`), depois `npm run build`, depois opcionalmente `npm prune --omit=dev`. |
+| `sh: 1: vite: not found` no `npm run build` em bare metal | Instalou só com `--omit=dev`; `vite` é dev-dependency. **Causa comum em redeploys:** `NODE_ENV=production` exportado no shell faz o npm pular devDeps automaticamente, mesmo sem `--omit=dev`. | Rode em subshell limpa: `( unset NODE_ENV; npm ci && npm run build )`. Ou force: `npm ci --include=dev && npm run build`. Depois opcional: `npm prune --omit=dev`. |
 | App falha com `ECONNREFUSED 5432` | Postgres ainda subindo, `DATABASE_URL` aponta para hostname inexistente (`timescaledb` em deploy bare metal), ou firewall bloqueando | Em Docker: ver `docker compose logs timescaledb`. Em bare metal: trocar host para `127.0.0.1` (ou IP/FQDN real) ou usar socket Unix com `?host=/var/run/postgresql`. |
 | `pg_hba.conf rejects connection for host "X.X.X.X", user "metricas_app", database "metricas_unifi", no encryption` | Falta linha em `pg_hba.conf` que case (TYPE, DATABASE, USER, ADDRESS); ou linha existe mas é `hostssl` enquanto o cliente conectou sem TLS | (a) Confirme que o **USER** nas regras é `metricas_app` (nome do role), **não** `metricas_unifi` (nome do banco). (b) Para conexão sem TLS na rede interna, use `host` em vez de `hostssl`. (c) Para socket Unix, use linha `local`. Aplique com `SELECT pg_reload_conf()`. |
 | `Error: self-signed certificate` (`DEPTH_ZERO_SELF_SIGNED_CERT`) | Postgres com cert autoassinado + cliente `pg` v9 valida cadeia por padrão | (a) **Preferível:** use socket Unix (`?host=/var/run/postgresql`) e contorne TLS. (b) Distribua o `server.crt` para o host da app e use `?sslmode=verify-full&sslrootcert=/caminho/server.crt`. (c) Apenas em rede interna confiável: `?uselibpqcompat=true&sslmode=require` (cifra sem verificar cert). |
