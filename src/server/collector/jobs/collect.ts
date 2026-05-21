@@ -83,7 +83,7 @@ export async function runCollectJob(
     client = await pool.getOrCreate(payload.controllerId);
   } catch (err) {
     const msg = errMsg(err);
-    markControllerError(db, payload.controllerId, `client: ${msg}`);
+    await markControllerError(db, payload.controllerId, `client: ${msg}`);
     throw err;
   }
 
@@ -93,20 +93,20 @@ export async function runCollectJob(
     remoteSites = await client.fetchSites();
   } catch (err) {
     const msg = errMsg(err);
-    markControllerError(db, payload.controllerId, `fetchSites: ${msg}`);
+    await markControllerError(db, payload.controllerId, `fetchSites: ${msg}`);
     throw err;
   }
 
   for (const s of remoteSites) {
     if (!s.name) continue;
-    upsertSite(db, payload.controllerId, {
+    await upsertSite(db, payload.controllerId, {
       unifiId: s._id ?? s.name,
       unifiName: s.name,
       displayName: s.desc ?? s.name,
     });
   }
 
-  const enabledSites = listEnabledSitesByController(db, payload.controllerId);
+  const enabledSites = await listEnabledSitesByController(db, payload.controllerId);
   const bucket = bucketTs(nowSeconds(), '5m');
 
   for (const site of enabledSites) {
@@ -119,12 +119,12 @@ export async function runCollectJob(
         db,
         log,
       );
-      const metricsRes = insertSamples5m(db, metrics);
-      const vapRes = insertVapSamples5m(db, vap);
-      const radioRes = insertRadioSamples5m(db, radios);
-      const portRes = insertPortSamples5m(db, ports);
-      const clientRes = insertClientSamples5m(db, clients);
-      const eventsRes = insertEvents(db, events);
+      const metricsRes = await insertSamples5m(db, metrics);
+      const vapRes = await insertVapSamples5m(db, vap);
+      const radioRes = await insertRadioSamples5m(db, radios);
+      const portRes = await insertPortSamples5m(db, ports);
+      const clientRes = await insertClientSamples5m(db, clients);
+      const eventsRes = await insertEvents(db, events);
       result.sitesPolled += 1;
       result.samplesInserted +=
         metricsRes.inserted +
@@ -154,13 +154,13 @@ export async function runCollectJob(
 
   if (result.errors.length === enabledSites.length && enabledSites.length > 0) {
     // Todos os sites falharam — sinaliza erro global no controller.
-    markControllerError(
+    await markControllerError(
       db,
       payload.controllerId,
       `todos os sites falharam (último erro: ${result.errors.at(-1)?.message})`,
     );
   } else {
-    markControllerSeen(db, payload.controllerId);
+    await markControllerSeen(db, payload.controllerId);
     // Falha parcial: deixa registro visível no log para diagnóstico, mas não
     // marca o controller como down. O markControllerSeen mantém lastSeenAt
     // limpo já que pelo menos 1 site respondeu.
@@ -212,7 +212,7 @@ async function collectSite(
   const macToDeviceId = new Map<string, string>();
   const seenAt = bucket * 1000;
   for (const r of parsedDevices) {
-    const id = upsertDevice(db, {
+    const id = await upsertDevice(db, {
       controllerId,
       siteId: site.id,
       mac: r.device.mac,
@@ -252,7 +252,7 @@ async function collectSite(
       // Catálogo: registra hostname/name do controller. displayAlias custom
       // é preservado por upsertClient em updates.
       if (parsed.clientMac) {
-        upsertClient(db, {
+        await upsertClient(db, {
           controllerId,
           siteId: site.id,
           mac: parsed.clientMac,

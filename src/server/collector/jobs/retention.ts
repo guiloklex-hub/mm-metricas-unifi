@@ -49,18 +49,18 @@ export async function runRetention(
   const threshold1h = now - cfg.retention1hDays * 86400;
   const thresholdEvents = now - (cfg.retentionEventsDays ?? 90) * 86400;
 
-  const purged5m = purgeOlderThan(db, 'metrics_5m', threshold5m);
-  const purged1h = purgeOlderThan(db, 'metrics_1h', threshold1h);
-  const purgedVap5m = purgeOlderThan(db, 'metrics_vap_5m', threshold5m);
-  const purgedVap1h = purgeOlderThan(db, 'metrics_vap_1h', threshold1h);
-  const purgedRadio5m = purgeRadioOlderThan(db, 'metrics_radio_5m', threshold5m);
-  const purgedRadio1h = purgeRadioOlderThan(db, 'metrics_radio_1h', threshold1h);
-  const purgedPort5m = purgePortOlderThan(db, 'metrics_port_5m', threshold5m);
-  const purgedPort1h = purgePortOlderThan(db, 'metrics_port_1h', threshold1h);
-  const purgedClient5m = purgeClientOlderThan(db, 'metrics_client_5m', threshold5m);
-  const purgedClient1h = purgeClientOlderThan(db, 'metrics_client_1h', threshold1h);
-  const purgedEvents = purgeEventsOlderThan(db, thresholdEvents);
-  optimize(db);
+  const purged5m = await purgeOlderThan(db, 'metrics_5m', threshold5m);
+  const purged1h = await purgeOlderThan(db, 'metrics_1h', threshold1h);
+  const purgedVap5m = await purgeOlderThan(db, 'metrics_vap_5m', threshold5m);
+  const purgedVap1h = await purgeOlderThan(db, 'metrics_vap_1h', threshold1h);
+  const purgedRadio5m = await purgeRadioOlderThan(db, 'metrics_radio_5m', threshold5m);
+  const purgedRadio1h = await purgeRadioOlderThan(db, 'metrics_radio_1h', threshold1h);
+  const purgedPort5m = await purgePortOlderThan(db, 'metrics_port_5m', threshold5m);
+  const purgedPort1h = await purgePortOlderThan(db, 'metrics_port_1h', threshold1h);
+  const purgedClient5m = await purgeClientOlderThan(db, 'metrics_client_5m', threshold5m);
+  const purgedClient1h = await purgeClientOlderThan(db, 'metrics_client_1h', threshold1h);
+  const purgedEvents = await purgeEventsOlderThan(db, thresholdEvents);
+  await optimize(db);
 
   const result: RetentionResult = {
     purged5m,

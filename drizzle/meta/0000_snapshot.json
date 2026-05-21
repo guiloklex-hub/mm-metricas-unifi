@@ -1,242 +1,388 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
-  "id": "aa42e1fd-1601-43ac-a946-714a0cf95be4",
+  "id": "3a569650-be23-4179-8138-0bb344d0a2ef",
   "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "app_config": {
+    "public.app_config": {
       "name": "app_config",
+      "schema": "",
       "columns": {
         "key": {
           "name": "key",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "value": {
           "name": "value",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "audit_log": {
+    "public.audit_log": {
       "name": "audit_log",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "integer",
+          "type": "bigserial",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": true
+          "notNull": true
         },
         "ts": {
           "name": "ts",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "actor": {
           "name": "actor",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "action": {
           "name": "action",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "target": {
           "name": "target",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "metadata": {
           "name": "metadata",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {
         "audit_log_ts_idx": {
           "name": "audit_log_ts_idx",
           "columns": [
-            "ts"
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "controllers": {
-      "name": "controllers",
+    "public.clients": {
+      "name": "clients",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mac": {
+          "name": "mac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hostname": {
+          "name": "hostname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": false
+        },
+        "display_alias": {
+          "name": "display_alias",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_seen": {
+          "name": "first_seen",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "clients_controller_mac_unique": {
+          "name": "clients_controller_mac_unique",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "clients_site_idx": {
+          "name": "clients_site_idx",
+          "columns": [
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "clients_alias_idx": {
+          "name": "clients_alias_idx",
+          "columns": [
+            {
+              "expression": "display_alias",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "clients_controller_id_controllers_id_fk": {
+          "name": "clients_controller_id_controllers_id_fk",
+          "tableFrom": "clients",
+          "tableTo": "controllers",
+          "columnsFrom": [
+            "controller_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "clients_site_id_sites_id_fk": {
+          "name": "clients_site_id_sites_id_fk",
+          "tableFrom": "clients",
+          "tableTo": "sites",
+          "columnsFrom": [
+            "site_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.controllers": {
+      "name": "controllers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "base_url": {
           "name": "base_url",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "variant": {
           "name": "variant",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "auth_mode": {
           "name": "auth_mode",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "username": {
           "name": "username",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "password_enc": {
           "name": "password_enc",
-          "type": "blob",
+          "type": "bytea",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "api_key_enc": {
           "name": "api_key_enc",
-          "type": "blob",
+          "type": "bytea",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "insecure_tls": {
           "name": "insecure_tls",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "poll_seconds": {
           "name": "poll_seconds",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 300
         },
         "enabled": {
           "name": "enabled",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 1
+          "default": true
         },
         "last_seen_at": {
           "name": "last_seen_at",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "last_error": {
           "name": "last_error",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "controllers_name_unique": {
           "name": "controllers_name_unique",
           "columns": [
-            "name"
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "counter_state": {
+    "public.counter_state": {
       "name": "counter_state",
+      "schema": "",
       "columns": {
         "controller_id": {
           "name": "controller_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "device_id": {
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "radio": {
@@ -244,7 +390,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_mac": {
@@ -252,131 +397,189 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
+          "default": "''"
+        },
+        "ssid": {
+          "name": "ssid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
           "default": "''"
         },
         "metric": {
           "name": "metric",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "last_value": {
           "name": "last_value",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "last_ts": {
           "name": "last_ts",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "counter_state_pk": {
+          "name": "counter_state_pk",
           "columns": [
             "controller_id",
             "site_id",
             "device_id",
             "radio",
             "client_mac",
+            "ssid",
             "metric"
-          ],
-          "name": "counter_state_pk"
+          ]
         }
       },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "devices": {
+    "public.devices": {
       "name": "devices",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "controller_id": {
           "name": "controller_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "mac": {
           "name": "mac",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "display_alias": {
+          "name": "display_alias",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "model": {
           "name": "model",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "type": {
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "first_seen": {
           "name": "first_seen",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "last_seen": {
           "name": "last_seen",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serial": {
+          "name": "serial",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {
         "devices_controller_mac_unique": {
           "name": "devices_controller_mac_unique",
           "columns": [
-            "controller_id",
-            "mac"
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "devices_site_idx": {
           "name": "devices_site_idx",
           "columns": [
-            "site_id"
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "devices_alias_idx": {
+          "name": "devices_alias_idx",
+          "columns": [
+            {
+              "expression": "display_alias",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -409,45 +612,255 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "jobs": {
-      "name": "jobs",
+    "public.events": {
+      "name": "events",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "bigserial",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "kind": {
-          "name": "kind",
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_mac": {
+          "name": "device_mac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_mac": {
+          "name": "client_mac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ssid": {
+          "name": "ssid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "payload_json": {
           "name": "payload_json",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "events_fingerprint_unique": {
+          "name": "events_fingerprint_unique",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fingerprint",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_ts_idx": {
+          "name": "events_ts_idx",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_severity_ts": {
+          "name": "events_severity_ts",
+          "columns": [
+            {
+              "expression": "severity",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_device_ts": {
+          "name": "events_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_type_ts": {
+          "name": "events_type_ts",
+          "columns": [
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "events_controller_ts": {
+          "name": "events_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.jobs": {
+      "name": "jobs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload_json": {
+          "name": "payload_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "run_at": {
           "name": "run_at",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'pending'"
         },
         "attempts": {
@@ -455,7 +868,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "max_attempts": {
@@ -463,84 +875,96 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 5
         },
         "locked_until": {
           "name": "locked_until",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "last_error": {
           "name": "last_error",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "updated_at": {
           "name": "updated_at",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "jobs_claim_idx": {
           "name": "jobs_claim_idx",
           "columns": [
-            "status",
-            "run_at",
-            "locked_until"
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "run_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "locked_until",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "metrics_1d": {
+    "public.metrics_1d": {
       "name": "metrics_1d",
+      "schema": "",
       "columns": {
         "ts": {
           "name": "ts",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "controller_id": {
           "name": "controller_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "device_id": {
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "radio": {
@@ -548,7 +972,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_mac": {
@@ -556,173 +979,375 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_count": {
           "name": "client_count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_bytes": {
           "name": "tx_bytes",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_packets": {
           "name": "tx_packets",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_dropped": {
           "name": "tx_dropped",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_errors": {
           "name": "tx_errors",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_retries": {
           "name": "tx_retries",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_errors": {
+          "name": "rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         },
         "d_tx_bytes": {
           "name": "d_tx_bytes",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_packets": {
           "name": "d_tx_packets",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_dropped": {
           "name": "d_tx_dropped",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_errors": {
           "name": "d_tx_errors",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_retries": {
           "name": "d_tx_retries",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_errors": {
+          "name": "d_rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wifi_tx_attempts": {
+          "name": "wifi_tx_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wifi_tx_dropped": {
+          "name": "wifi_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_crypts": {
+          "name": "rx_crypts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mac_filter_rejections": {
+          "name": "mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_roam_events": {
+          "name": "num_roam_events",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_wifi_tx_attempts": {
+          "name": "d_wifi_tx_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_wifi_tx_dropped": {
+          "name": "d_wifi_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_crypts": {
+          "name": "d_rx_crypts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_mac_filter_rejections": {
+          "name": "d_mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_num_roam_events": {
+          "name": "d_num_roam_events",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cpu_pct": {
+          "name": "cpu_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mem_pct": {
+          "name": "mem_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uptime_sec": {
+          "name": "uptime_sec",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_cpu": {
+          "name": "temp_cpu",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_board": {
+          "name": "temp_board",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
         },
         "retry_rate": {
           "name": "retry_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "error_rate": {
           "name": "error_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "drop_rate": {
           "name": "drop_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {
         "metrics_1d_dim_unique": {
           "name": "metrics_1d_dim_unique",
           "columns": [
-            "ts",
-            "controller_id",
-            "site_id",
-            "device_id",
-            "radio",
-            "client_mac"
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_1d_device_ts": {
           "name": "metrics_1d_device_ts",
           "columns": [
-            "device_id",
-            "ts"
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_1d_site_ts": {
           "name": "metrics_1d_site_ts",
           "columns": [
-            "site_id",
-            "ts"
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_1d_controller_ts": {
+          "name": "metrics_1d_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "metrics_1h": {
+    "public.metrics_1h": {
       "name": "metrics_1h",
+      "schema": "",
       "columns": {
         "ts": {
           "name": "ts",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "controller_id": {
           "name": "controller_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "device_id": {
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "radio": {
@@ -730,7 +1355,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_mac": {
@@ -738,173 +1362,375 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_count": {
           "name": "client_count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_bytes": {
           "name": "tx_bytes",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_packets": {
           "name": "tx_packets",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_dropped": {
           "name": "tx_dropped",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_errors": {
           "name": "tx_errors",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_retries": {
           "name": "tx_retries",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_errors": {
+          "name": "rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         },
         "d_tx_bytes": {
           "name": "d_tx_bytes",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_packets": {
           "name": "d_tx_packets",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_dropped": {
           "name": "d_tx_dropped",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_errors": {
           "name": "d_tx_errors",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_retries": {
           "name": "d_tx_retries",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_errors": {
+          "name": "d_rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wifi_tx_attempts": {
+          "name": "wifi_tx_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wifi_tx_dropped": {
+          "name": "wifi_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_crypts": {
+          "name": "rx_crypts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mac_filter_rejections": {
+          "name": "mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_roam_events": {
+          "name": "num_roam_events",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_wifi_tx_attempts": {
+          "name": "d_wifi_tx_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_wifi_tx_dropped": {
+          "name": "d_wifi_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_crypts": {
+          "name": "d_rx_crypts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_mac_filter_rejections": {
+          "name": "d_mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_num_roam_events": {
+          "name": "d_num_roam_events",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cpu_pct": {
+          "name": "cpu_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mem_pct": {
+          "name": "mem_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uptime_sec": {
+          "name": "uptime_sec",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_cpu": {
+          "name": "temp_cpu",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_board": {
+          "name": "temp_board",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
         },
         "retry_rate": {
           "name": "retry_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "error_rate": {
           "name": "error_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "drop_rate": {
           "name": "drop_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {
         "metrics_1h_dim_unique": {
           "name": "metrics_1h_dim_unique",
           "columns": [
-            "ts",
-            "controller_id",
-            "site_id",
-            "device_id",
-            "radio",
-            "client_mac"
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_1h_device_ts": {
           "name": "metrics_1h_device_ts",
           "columns": [
-            "device_id",
-            "ts"
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_1h_site_ts": {
           "name": "metrics_1h_site_ts",
           "columns": [
-            "site_id",
-            "ts"
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_1h_controller_ts": {
+          "name": "metrics_1h_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "metrics_5m": {
+    "public.metrics_5m": {
       "name": "metrics_5m",
+      "schema": "",
       "columns": {
         "ts": {
           "name": "ts",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "controller_id": {
           "name": "controller_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "site_id": {
           "name": "site_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "device_id": {
           "name": "device_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "radio": {
@@ -912,7 +1738,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_mac": {
@@ -920,220 +1745,3124 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "client_count": {
           "name": "client_count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_bytes": {
           "name": "tx_bytes",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_packets": {
           "name": "tx_packets",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_dropped": {
           "name": "tx_dropped",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_errors": {
           "name": "tx_errors",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "tx_retries": {
           "name": "tx_retries",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_errors": {
+          "name": "rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
         },
         "d_tx_bytes": {
           "name": "d_tx_bytes",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_packets": {
           "name": "d_tx_packets",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_dropped": {
           "name": "d_tx_dropped",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_errors": {
           "name": "d_tx_errors",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "d_tx_retries": {
           "name": "d_tx_retries",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_errors": {
+          "name": "d_rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wifi_tx_attempts": {
+          "name": "wifi_tx_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "wifi_tx_dropped": {
+          "name": "wifi_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_crypts": {
+          "name": "rx_crypts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mac_filter_rejections": {
+          "name": "mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_roam_events": {
+          "name": "num_roam_events",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_wifi_tx_attempts": {
+          "name": "d_wifi_tx_attempts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_wifi_tx_dropped": {
+          "name": "d_wifi_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_crypts": {
+          "name": "d_rx_crypts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_mac_filter_rejections": {
+          "name": "d_mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_num_roam_events": {
+          "name": "d_num_roam_events",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cpu_pct": {
+          "name": "cpu_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mem_pct": {
+          "name": "mem_pct",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uptime_sec": {
+          "name": "uptime_sec",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_cpu": {
+          "name": "temp_cpu",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "temp_board": {
+          "name": "temp_board",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
         },
         "retry_rate": {
           "name": "retry_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "error_rate": {
           "name": "error_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "drop_rate": {
           "name": "drop_rate",
-          "type": "real",
+          "type": "double precision",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         }
       },
       "indexes": {
         "metrics_5m_dim_unique": {
           "name": "metrics_5m_dim_unique",
           "columns": [
-            "ts",
-            "controller_id",
-            "site_id",
-            "device_id",
-            "radio",
-            "client_mac"
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_5m_device_ts": {
           "name": "metrics_5m_device_ts",
           "columns": [
-            "device_id",
-            "ts"
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_5m_site_ts": {
           "name": "metrics_5m_site_ts",
           "columns": [
-            "site_id",
-            "ts"
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "metrics_5m_client_ts": {
           "name": "metrics_5m_client_ts",
           "columns": [
-            "client_mac",
-            "ts"
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_5m_controller_ts": {
+          "name": "metrics_5m_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "sites": {
-      "name": "sites",
+    "public.metrics_client_1h": {
+      "name": "metrics_client_1h",
+      "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
         },
         "controller_id": {
           "name": "controller_id",
           "type": "text",
           "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ap_device_id": {
+          "name": "ap_device_id",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "default": "''"
+        },
+        "client_mac": {
+          "name": "client_mac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "essid": {
+          "name": "essid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "channel": {
+          "name": "channel",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signal": {
+          "name": "signal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "noise": {
+          "name": "noise",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_rate_kbps": {
+          "name": "tx_rate_kbps",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_rate_kbps": {
+          "name": "rx_rate_kbps",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "idle_time": {
+          "name": "idle_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "roam_count": {
+          "name": "roam_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_guest": {
+          "name": "is_guest",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_wired": {
+          "name": "is_wired",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uptime_sec": {
+          "name": "uptime_sec",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_retries": {
+          "name": "tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_retries": {
+          "name": "rx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_client_1h_dim_unique": {
+          "name": "metrics_client_1h_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_client_1h_controller_ts": {
+          "name": "metrics_client_1h_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_client_1h_client_ts": {
+          "name": "metrics_client_1h_client_ts",
+          "columns": [
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_client_5m": {
+      "name": "metrics_client_5m",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ap_device_id": {
+          "name": "ap_device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "client_mac": {
+          "name": "client_mac",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "essid": {
+          "name": "essid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "channel": {
+          "name": "channel",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signal": {
+          "name": "signal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "noise": {
+          "name": "noise",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_rate_kbps": {
+          "name": "tx_rate_kbps",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_rate_kbps": {
+          "name": "rx_rate_kbps",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "idle_time": {
+          "name": "idle_time",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "roam_count": {
+          "name": "roam_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_guest": {
+          "name": "is_guest",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_wired": {
+          "name": "is_wired",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uptime_sec": {
+          "name": "uptime_sec",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_retries": {
+          "name": "tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_retries": {
+          "name": "rx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_client_5m_dim_unique": {
+          "name": "metrics_client_5m_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_client_5m_ap_ts": {
+          "name": "metrics_client_5m_ap_ts",
+          "columns": [
+            {
+              "expression": "ap_device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_client_5m_controller_ts": {
+          "name": "metrics_client_5m_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_client_5m_client_ts": {
+          "name": "metrics_client_5m_client_ts",
+          "columns": [
+            {
+              "expression": "client_mac",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_port_1d": {
+      "name": "metrics_port_1d",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "port_idx": {
+          "name": "port_idx",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enable": {
+          "name": "enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "up": {
+          "name": "up",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "speed": {
+          "name": "speed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_duplex": {
+          "name": "full_duplex",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_enable": {
+          "name": "poe_enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_power": {
+          "name": "poe_power",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_voltage": {
+          "name": "poe_voltage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_packets": {
+          "name": "tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_errors": {
+          "name": "tx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_errors": {
+          "name": "rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_dropped": {
+          "name": "tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_bytes": {
+          "name": "d_tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_packets": {
+          "name": "d_tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_errors": {
+          "name": "d_tx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_errors": {
+          "name": "d_rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_dropped": {
+          "name": "d_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_port_1d_dim_unique": {
+          "name": "metrics_port_1d_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "port_idx",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_port_1d_device_ts": {
+          "name": "metrics_port_1d_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_port_1d_controller_ts": {
+          "name": "metrics_port_1d_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_port_1h": {
+      "name": "metrics_port_1h",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "port_idx": {
+          "name": "port_idx",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enable": {
+          "name": "enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "up": {
+          "name": "up",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "speed": {
+          "name": "speed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_duplex": {
+          "name": "full_duplex",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_enable": {
+          "name": "poe_enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_power": {
+          "name": "poe_power",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_voltage": {
+          "name": "poe_voltage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_packets": {
+          "name": "tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_errors": {
+          "name": "tx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_errors": {
+          "name": "rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_dropped": {
+          "name": "tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_bytes": {
+          "name": "d_tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_packets": {
+          "name": "d_tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_errors": {
+          "name": "d_tx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_errors": {
+          "name": "d_rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_dropped": {
+          "name": "d_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_port_1h_dim_unique": {
+          "name": "metrics_port_1h_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "port_idx",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_port_1h_device_ts": {
+          "name": "metrics_port_1h_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_port_1h_controller_ts": {
+          "name": "metrics_port_1h_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_port_5m": {
+      "name": "metrics_port_5m",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "port_idx": {
+          "name": "port_idx",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enable": {
+          "name": "enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "up": {
+          "name": "up",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "speed": {
+          "name": "speed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_duplex": {
+          "name": "full_duplex",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_enable": {
+          "name": "poe_enable",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_power": {
+          "name": "poe_power",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "poe_voltage": {
+          "name": "poe_voltage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_packets": {
+          "name": "tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_errors": {
+          "name": "tx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_errors": {
+          "name": "rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_dropped": {
+          "name": "tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_bytes": {
+          "name": "d_tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_packets": {
+          "name": "d_tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_errors": {
+          "name": "d_tx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_errors": {
+          "name": "d_rx_errors",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_dropped": {
+          "name": "d_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_port_5m_dim_unique": {
+          "name": "metrics_port_5m_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "port_idx",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_port_5m_device_ts": {
+          "name": "metrics_port_5m_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_port_5m_controller_ts": {
+          "name": "metrics_port_5m_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_radio_1d": {
+      "name": "metrics_radio_1d",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel": {
+          "name": "channel",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_power": {
+          "name": "tx_power",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_sta": {
+          "name": "num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_num_sta": {
+          "name": "user_num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "guest_num_sta": {
+          "name": "guest_num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_total": {
+          "name": "cu_total",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_self_tx": {
+          "name": "cu_self_tx",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_self_rx": {
+          "name": "cu_self_rx",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "satisfaction": {
+          "name": "satisfaction",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_radio_1d_dim_unique": {
+          "name": "metrics_radio_1d_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_radio_1d_device_ts": {
+          "name": "metrics_radio_1d_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_radio_1d_controller_ts": {
+          "name": "metrics_radio_1d_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_radio_1h": {
+      "name": "metrics_radio_1h",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel": {
+          "name": "channel",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_power": {
+          "name": "tx_power",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_sta": {
+          "name": "num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_num_sta": {
+          "name": "user_num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "guest_num_sta": {
+          "name": "guest_num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_total": {
+          "name": "cu_total",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_self_tx": {
+          "name": "cu_self_tx",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_self_rx": {
+          "name": "cu_self_rx",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "satisfaction": {
+          "name": "satisfaction",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_radio_1h_dim_unique": {
+          "name": "metrics_radio_1h_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_radio_1h_device_ts": {
+          "name": "metrics_radio_1h_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_radio_1h_controller_ts": {
+          "name": "metrics_radio_1h_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_radio_5m": {
+      "name": "metrics_radio_5m",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "channel": {
+          "name": "channel",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_power": {
+          "name": "tx_power",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "num_sta": {
+          "name": "num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_num_sta": {
+          "name": "user_num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "guest_num_sta": {
+          "name": "guest_num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_total": {
+          "name": "cu_total",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_self_tx": {
+          "name": "cu_self_tx",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cu_self_rx": {
+          "name": "cu_self_rx",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "satisfaction": {
+          "name": "satisfaction",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_radio_5m_dim_unique": {
+          "name": "metrics_radio_5m_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_radio_5m_device_ts": {
+          "name": "metrics_radio_5m_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_radio_5m_controller_ts": {
+          "name": "metrics_radio_5m_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_vap_1d": {
+      "name": "metrics_vap_1d",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ssid": {
+          "name": "ssid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "num_sta": {
+          "name": "num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_guest": {
+          "name": "is_guest",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_client_signal": {
+          "name": "avg_client_signal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_packets": {
+          "name": "tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_retries": {
+          "name": "tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_dropped": {
+          "name": "tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mac_filter_rejections": {
+          "name": "mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ccq": {
+          "name": "ccq",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "satisfaction": {
+          "name": "satisfaction",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_bytes": {
+          "name": "d_tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_packets": {
+          "name": "d_tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_retries": {
+          "name": "d_tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_dropped": {
+          "name": "d_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_mac_filter_rejections": {
+          "name": "d_mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_vap_1d_dim_unique": {
+          "name": "metrics_vap_1d_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ssid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_1d_device_ts": {
+          "name": "metrics_vap_1d_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_1d_ssid_ts": {
+          "name": "metrics_vap_1d_ssid_ts",
+          "columns": [
+            {
+              "expression": "ssid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_1d_controller_ts": {
+          "name": "metrics_vap_1d_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_vap_1h": {
+      "name": "metrics_vap_1h",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ssid": {
+          "name": "ssid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "num_sta": {
+          "name": "num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_guest": {
+          "name": "is_guest",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_client_signal": {
+          "name": "avg_client_signal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_packets": {
+          "name": "tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_retries": {
+          "name": "tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_dropped": {
+          "name": "tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mac_filter_rejections": {
+          "name": "mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ccq": {
+          "name": "ccq",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "satisfaction": {
+          "name": "satisfaction",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_bytes": {
+          "name": "d_tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_packets": {
+          "name": "d_tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_retries": {
+          "name": "d_tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_dropped": {
+          "name": "d_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_mac_filter_rejections": {
+          "name": "d_mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_vap_1h_dim_unique": {
+          "name": "metrics_vap_1h_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ssid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_1h_device_ts": {
+          "name": "metrics_vap_1h_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_1h_ssid_ts": {
+          "name": "metrics_vap_1h_ssid_ts",
+          "columns": [
+            {
+              "expression": "ssid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_1h_controller_ts": {
+          "name": "metrics_vap_1h_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.metrics_vap_5m": {
+      "name": "metrics_vap_5m",
+      "schema": "",
+      "columns": {
+        "ts": {
+          "name": "ts",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "site_id": {
+          "name": "site_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "radio": {
+          "name": "radio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ssid": {
+          "name": "ssid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "num_sta": {
+          "name": "num_sta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_guest": {
+          "name": "is_guest",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_client_signal": {
+          "name": "avg_client_signal",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_bytes": {
+          "name": "tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_bytes": {
+          "name": "rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_packets": {
+          "name": "tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_packets": {
+          "name": "rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_retries": {
+          "name": "tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tx_dropped": {
+          "name": "tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rx_dropped": {
+          "name": "rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mac_filter_rejections": {
+          "name": "mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ccq": {
+          "name": "ccq",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "satisfaction": {
+          "name": "satisfaction",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_bytes": {
+          "name": "d_tx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_bytes": {
+          "name": "d_rx_bytes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_packets": {
+          "name": "d_tx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_packets": {
+          "name": "d_rx_packets",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_retries": {
+          "name": "d_tx_retries",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_tx_dropped": {
+          "name": "d_tx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_rx_dropped": {
+          "name": "d_rx_dropped",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "d_mac_filter_rejections": {
+          "name": "d_mac_filter_rejections",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "metrics_vap_5m_dim_unique": {
+          "name": "metrics_vap_5m_dim_unique",
+          "columns": [
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "radio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ssid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_5m_device_ts": {
+          "name": "metrics_vap_5m_device_ts",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_5m_ssid_ts": {
+          "name": "metrics_vap_5m_ssid_ts",
+          "columns": [
+            {
+              "expression": "ssid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "metrics_vap_5m_controller_ts": {
+          "name": "metrics_vap_5m_controller_ts",
+          "columns": [
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ts",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sites": {
+      "name": "sites",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "controller_id": {
+          "name": "controller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
         },
         "unifi_id": {
           "name": "unifi_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "unifi_name": {
           "name": "unifi_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "display_name": {
           "name": "display_name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "city": {
           "name": "city",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "enabled": {
           "name": "enabled",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
-          "default": 1
+          "default": true
         }
       },
       "indexes": {
         "sites_controller_name_unique": {
           "name": "sites_controller_name_unique",
           "columns": [
-            "controller_id",
-            "unifi_name"
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "unifi_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "sites_controller_idx": {
           "name": "sites_controller_idx",
           "columns": [
-            "controller_id"
+            {
+              "expression": "controller_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1153,17 +4882,20 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
-  "views": {},
   "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
   "_meta": {
+    "columns": {},
     "schemas": {},
-    "tables": {},
-    "columns": {}
-  },
-  "internal": {
-    "indexes": {}
+    "tables": {}
   }
 }

@@ -18,7 +18,7 @@ const changePasswordSchema = z.object({
 
 export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/auth/setup-status', async () => {
-    const row = await db.select().from(appConfig).where(eq(appConfig.key, SETUP_KEY)).get();
+    const row = await db.select().from(appConfig).where(eq(appConfig.key, SETUP_KEY)).limit(1).then((r) => r[0]);
     return { ok: true, data: { complete: row?.value === 'true' } };
   });
 
@@ -28,13 +28,14 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
       config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
     },
     async (req, reply) => {
-      const setupRow = await db.select().from(appConfig).where(eq(appConfig.key, SETUP_KEY)).get();
+      const setupRow = await db.select().from(appConfig).where(eq(appConfig.key, SETUP_KEY)).limit(1).then((r) => r[0]);
       if (setupRow?.value === 'true') {
         return reply.code(409).send({ ok: false, error: 'setup_already_complete' });
       }
       const input = setupAdminInputSchema.parse(req.body);
       const hash = await hashPassword(input.password);
-      db.insert(appConfig)
+      await db
+        .insert(appConfig)
         .values([
           { key: PASSWORD_KEY, value: hash },
           { key: SETUP_KEY, value: 'true' },
@@ -42,9 +43,8 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
         .onConflictDoUpdate({
           target: appConfig.key,
           set: { value: hash },
-        })
-        .run();
-      logAudit(db, { action: 'auth.setup', actor: 'admin' });
+        });
+      await logAudit(db, { action: 'auth.setup', actor: 'admin' });
       return reply.code(201).send({ ok: true, data: { setupComplete: true } });
     },
   );
@@ -56,13 +56,13 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
     },
     async (req, reply) => {
       const input = loginInputSchema.parse(req.body);
-      const row = await db.select().from(appConfig).where(eq(appConfig.key, PASSWORD_KEY)).get();
+      const row = await db.select().from(appConfig).where(eq(appConfig.key, PASSWORD_KEY)).limit(1).then((r) => r[0]);
       if (!row) {
         return reply.code(409).send({ ok: false, error: 'setup_required' });
       }
       const ok = await verifyPassword(row.value, input.password);
       if (!ok) {
-        logAudit(db, { action: 'auth.login.failed', actor: clientIp(req) });
+        await logAudit(db, { action: 'auth.login.failed', actor: clientIp(req) });
         await new Promise((r) => setTimeout(r, 200 + Math.random() * 200));
         return reply.code(401).send({ ok: false, error: 'invalid_credentials' });
       }
@@ -74,14 +74,14 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
         path: '/',
         maxAge: 24 * 60 * 60,
       });
-      logAudit(db, { action: 'auth.login.success', actor: clientIp(req) });
+      await logAudit(db, { action: 'auth.login.success', actor: clientIp(req) });
       return reply.send({ ok: true, data: { role: 'admin' } });
     },
   );
 
   app.post('/api/v1/auth/logout', async (req, reply) => {
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
-    logAudit(db, { action: 'auth.logout', actor: clientIp(req) });
+    await logAudit(db, { action: 'auth.logout', actor: clientIp(req) });
     return reply.send({ ok: true });
   });
 
@@ -95,7 +95,7 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
     { preHandler: app.requireAdmin() },
     async (req, reply) => {
       const input = changePasswordSchema.parse(req.body);
-      const row = await db.select().from(appConfig).where(eq(appConfig.key, PASSWORD_KEY)).get();
+      const row = await db.select().from(appConfig).where(eq(appConfig.key, PASSWORD_KEY)).limit(1).then((r) => r[0]);
       if (!row) {
         return reply.code(409).send({ ok: false, error: 'setup_required' });
       }
@@ -105,8 +105,8 @@ export async function registerAuthRoutes(app: FastifyInstance, db: DB): Promise<
         return reply.code(401).send({ ok: false, error: 'invalid_credentials' });
       }
       const hash = await hashPassword(input.newPassword);
-      db.update(appConfig).set({ value: hash }).where(eq(appConfig.key, PASSWORD_KEY)).run();
-      logAudit(db, { action: 'auth.password_changed', actor: clientIp(req) });
+      await db.update(appConfig).set({ value: hash }).where(eq(appConfig.key, PASSWORD_KEY));
+      await logAudit(db, { action: 'auth.password_changed', actor: clientIp(req) });
       return reply.send({ ok: true });
     },
   );

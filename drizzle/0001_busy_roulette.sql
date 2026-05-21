@@ -1,1 +1,0 @@
-ALTER TABLE `devices` ADD `display_alias` text;

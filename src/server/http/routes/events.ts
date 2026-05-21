@@ -32,7 +32,7 @@ const histogramSchema = z
 export async function registerEventsRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/events', { preHandler: app.requireAdmin() }, async (req) => {
     const q = listSchema.parse(req.query);
-    const rows = listEvents(db, q);
+    const rows = await listEvents(db, q);
     return {
       ok: true,
       data: {
@@ -44,7 +44,7 @@ export async function registerEventsRoutes(app: FastifyInstance, db: DB): Promis
 
   app.get('/api/v1/events/histogram', { preHandler: app.requireAdmin() }, async (req) => {
     const q = histogramSchema.parse(req.query);
-    const buckets = eventHistogramHourly(db, q);
+    const buckets = await eventHistogramHourly(db, q);
     return { ok: true, data: { from: q.from, to: q.to, buckets } };
   });
 }

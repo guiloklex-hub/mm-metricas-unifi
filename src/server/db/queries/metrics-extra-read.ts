@@ -1,6 +1,7 @@
 import type { DB } from '@server/db/client.ts';
 import { chooseGranularity } from '@server/utils/time.ts';
 import type { Granularity } from '@shared/schemas/metrics.ts';
+import { rawAll } from './sql-utils.ts';
 
 /**
  * Leituras de séries temporais das tabelas novas (radio, port, client).
@@ -41,7 +42,7 @@ export interface RadioMetricRow {
   satisfaction: number | null;
 }
 
-export function queryRadioMetrics(
+export async function queryRadioMetrics(
   db: DB,
   args: {
     from: number;
@@ -53,7 +54,7 @@ export function queryRadioMetrics(
     radio?: 'ng' | 'na' | '6e';
     limit?: number;
   },
-): { rows: RadioMetricRow[]; granularity: Granularity } {
+): Promise<{ rows: RadioMetricRow[]; granularity: Granularity }> {
   const granularity = args.granularity ?? chooseGranularity(args.from, args.to);
   const table = RADIO_TABLE[granularity];
   const where: string[] = ['ts >= ?', 'ts <= ?'];
@@ -86,7 +87,7 @@ export function queryRadioMetrics(
     ORDER BY ts ASC
     LIMIT ?`;
   params.push(limit);
-  const rows = db.$client.prepare(sql).all(...params) as RadioMetricRow[];
+  const rows = await rawAll<RadioMetricRow>(db, sql, params);
   return { rows, granularity };
 }
 
@@ -97,9 +98,9 @@ export interface PortMetricRow {
   deviceId: string;
   portIdx: number;
   name: string | null;
-  up: number | null;
+  up: boolean | null;
   speed: number | null;
-  fullDuplex: number | null;
+  fullDuplex: boolean | null;
   poePower: number | null;
   dTxBytes: number | null;
   dRxBytes: number | null;
@@ -109,7 +110,7 @@ export interface PortMetricRow {
   dRxDropped: number | null;
 }
 
-export function queryPortMetrics(
+export async function queryPortMetrics(
   db: DB,
   args: {
     from: number;
@@ -121,7 +122,7 @@ export function queryPortMetrics(
     portIdx?: number;
     limit?: number;
   },
-): { rows: PortMetricRow[]; granularity: Granularity } {
+): Promise<{ rows: PortMetricRow[]; granularity: Granularity }> {
   const granularity = args.granularity ?? chooseGranularity(args.from, args.to);
   const table = PORT_TABLE[granularity];
   const where: string[] = ['ts >= ?', 'ts <= ?'];
@@ -155,7 +156,7 @@ export function queryPortMetrics(
     ORDER BY ts ASC
     LIMIT ?`;
   params.push(limit);
-  const rows = db.$client.prepare(sql).all(...params) as PortMetricRow[];
+  const rows = await rawAll<PortMetricRow>(db, sql, params);
   return { rows, granularity };
 }
 
@@ -173,10 +174,10 @@ export interface ClientMetricRow {
   txRateKbps: number | null;
   rxRateKbps: number | null;
   roamCount: number | null;
-  isGuest: number | null;
+  isGuest: boolean | null;
 }
 
-export function queryClientMetrics(
+export async function queryClientMetrics(
   db: DB,
   args: {
     from: number;
@@ -188,7 +189,7 @@ export function queryClientMetrics(
     apDeviceId?: string;
     limit?: number;
   },
-): { rows: ClientMetricRow[]; granularity: Granularity } {
+): Promise<{ rows: ClientMetricRow[]; granularity: Granularity }> {
   const granularity = args.granularity ?? chooseGranularity(args.from, args.to);
   const table = CLIENT_TABLE[granularity];
   const where: string[] = ['ts >= ?', 'ts <= ?'];
@@ -224,6 +225,6 @@ export function queryClientMetrics(
     ORDER BY ts ASC
     LIMIT ?`;
   params.push(limit);
-  const rows = db.$client.prepare(sql).all(...params) as ClientMetricRow[];
+  const rows = await rawAll<ClientMetricRow>(db, sql, params);
   return { rows, granularity };
 }

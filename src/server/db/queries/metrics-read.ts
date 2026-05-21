@@ -1,6 +1,7 @@
 import type { DB } from '@server/db/client.ts';
 import { chooseGranularity } from '@server/utils/time.ts';
 import type { Granularity } from '@shared/schemas/metrics.ts';
+import { rawAll } from './sql-utils.ts';
 
 const TABLE_BY_GRAN: Record<Granularity, string> = {
   '5m': 'metrics_5m',
@@ -58,10 +59,10 @@ export interface QueryMetricsArgs {
   limit?: number;
 }
 
-export function queryMetrics(
+export async function queryMetrics(
   db: DB,
   args: QueryMetricsArgs,
-): { rows: MetricRow[]; granularity: Granularity } {
+): Promise<{ rows: MetricRow[]; granularity: Granularity }> {
   const granularity = args.granularity ?? chooseGranularity(args.from, args.to);
   const table = TABLE_BY_GRAN[granularity];
 
@@ -131,7 +132,7 @@ export function queryMetrics(
     LIMIT ?`;
   params.push(limit);
 
-  const raw = db.$client.prepare(sql).all(...params) as Array<{
+  const raw = await rawAll<{
     ts: number;
     controllerId: string;
     siteId: string;
@@ -159,7 +160,7 @@ export function queryMetrics(
     retryRate: number | null;
     errorRate: number | null;
     dropRate: number | null;
-  }>;
+  }>(db, sql, params);
 
   const rows: MetricRow[] = raw.map((r) => ({
     ts: r.ts,
@@ -223,10 +224,10 @@ export interface QueryVapArgs {
   limit?: number;
 }
 
-export function queryVapMetrics(
+export async function queryVapMetrics(
   db: DB,
   args: QueryVapArgs,
-): { rows: VapRow[]; granularity: Granularity } {
+): Promise<{ rows: VapRow[]; granularity: Granularity }> {
   const granularity = args.granularity ?? chooseGranularity(args.from, args.to);
   const table = VAP_TABLE_BY_GRAN[granularity];
 
@@ -267,7 +268,7 @@ export function queryVapMetrics(
     LIMIT ?`;
   params.push(limit);
 
-  const raw = db.$client.prepare(sql).all(...params) as Array<{
+  const raw = await rawAll<{
     ts: number;
     controllerId: string;
     siteId: string;
@@ -275,12 +276,12 @@ export function queryVapMetrics(
     radio: 'ng' | 'na' | '6e';
     ssid: string;
     numSta: number | null;
-    isGuest: number | null;
+    isGuest: boolean | null;
     avgClientSignal: number | null;
     dTxBytes: number | null;
     dRxBytes: number | null;
     dMacFilterRejections: number | null;
-  }>;
+  }>(db, sql, params);
 
   const rows: VapRow[] = raw.map((r) => ({
     ts: r.ts,
@@ -290,7 +291,7 @@ export function queryVapMetrics(
     radio: r.radio,
     ssid: r.ssid,
     numSta: r.numSta,
-    isGuest: r.isGuest === null ? null : r.isGuest === 1,
+    isGuest: r.isGuest,
     avgClientSignal: r.avgClientSignal,
     dTxBytes: r.dTxBytes,
     dRxBytes: r.dRxBytes,

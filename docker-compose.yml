@@ -1,17 +1,44 @@
 services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: metricas-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: metricas_unifi
+      POSTGRES_USER: metricas_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env (openssl rand -base64 32)}
+      # Tuning conservador para o entrypoint do Timescale.
+      TS_TUNE_MAX_CONNS: 50
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sem 'ports:' por default — o banco fica acessível só pela rede interna.
+    # Para inspecionar com psql do host, use docker-compose.dev.yml.
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - internal
+
   metricas-unifi:
     image: ghcr.io/guiloklex-hub/metricas-unifi:latest
     # Para build local em vez de pull:
     # build: .
     container_name: metricas-unifi
     restart: unless-stopped
+    depends_on:
+      timescaledb:
+        condition: service_healthy
     ports:
       - '3000:3000'
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
-      DATABASE_PATH: /app/data/app.db
+      DATABASE_URL: postgresql://metricas_app:${POSTGRES_PASSWORD}@timescaledb:5432/metricas_unifi
       LOG_LEVEL: info
       MASTER_KEY: ${MASTER_KEY:?Defina MASTER_KEY no .env (openssl rand -base64 32)}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env (openssl rand -base64 64)}
@@ -19,6 +46,7 @@ services:
       RETENTION_5M_DAYS: 30
       RETENTION_1H_DAYS: 365
     volumes:
+      # Diretório para PDFs gerados pelo /api/v1/reports/pdf.
       - ./data:/app/data:Z
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/healthz']
@@ -26,3 +54,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+    driver: bridge

@@ -88,7 +88,7 @@ export async function runBackfillJob(
     client = await pool.getOrCreate(payload.controllerId);
   } catch (err) {
     const msg = errMsg(err);
-    markControllerError(db, payload.controllerId, `backfill client: ${msg}`);
+    await markControllerError(db, payload.controllerId, `backfill client: ${msg}`);
     throw err;
   }
 
@@ -99,7 +99,7 @@ export async function runBackfillJob(
   const end = Date.now();
   const start = end - payload.days * 86400 * 1000;
 
-  const sites = listEnabledSitesByController(db, payload.controllerId);
+  const sites = await listEnabledSitesByController(db, payload.controllerId);
   for (const site of sites) {
     let sitePointsFetched = 0;
     let siteInserted = 0;
@@ -125,7 +125,7 @@ export async function runBackfillJob(
           if (!parsed) continue;
           siteSamples.push(toHistoricalSample(parsed, granularity, null));
         }
-        const sitePersist = insertHistoricalSamples(db, table, siteSamples);
+        const sitePersist = await insertHistoricalSamples(db, table, siteSamples);
         sitePointsFetched += sitePoints.length;
         siteInserted += sitePersist.inserted;
         siteSkipped += sitePersist.skipped;
@@ -143,14 +143,14 @@ export async function runBackfillJob(
           if (typeof p.ap === 'string') macsSeen.add(p.ap.toLowerCase());
         }
         for (const mac of macsSeen) {
-          const existing = findDeviceByMac(db, payload.controllerId, mac);
+          const existing = await findDeviceByMac(db, payload.controllerId, mac);
           if (existing) {
             macToDeviceId.set(mac, existing.id);
             continue;
           }
           // Device desconhecido (offline ou ainda não coletado em tempo real):
           // criamos placeholder pra preservar a relação.
-          const id = upsertDevice(db, {
+          const id = await upsertDevice(db, {
             controllerId: payload.controllerId,
             siteId: site.id,
             mac,
@@ -173,7 +173,7 @@ export async function runBackfillJob(
           const deviceId = parsed.deviceMac ? (macToDeviceId.get(parsed.deviceMac) ?? null) : null;
           apSamples.push(toHistoricalSample(parsed, granularity, deviceId));
         }
-        const apPersist = insertHistoricalSamples(db, table, apSamples);
+        const apPersist = await insertHistoricalSamples(db, table, apSamples);
         sitePointsFetched += apPoints.length;
         siteInserted += apPersist.inserted;
         siteSkipped += apPersist.skipped;

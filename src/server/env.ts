@@ -4,7 +4,13 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  DATABASE_PATH: z.string().default('./data/app.db'),
+  DATABASE_URL: z
+    .string()
+    .regex(
+      /^postgres(ql)?:\/\//,
+      'DATABASE_URL deve iniciar com `postgres://` ou `postgresql://`',
+    )
+    .default('postgresql://localhost:5432/metricas_unifi'),
   MASTER_KEY: z
     .string()
     .min(1, 'MASTER_KEY obrigatório (32 bytes base64)')

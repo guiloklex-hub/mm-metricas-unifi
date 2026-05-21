@@ -13,68 +13,64 @@ export interface SiteRow {
   enabled: boolean;
 }
 
-export function listSitesByController(db: DB, controllerId: string): SiteRow[] {
-  const rows = db.select().from(sites).where(eq(sites.controllerId, controllerId)).all();
+type SiteRecord = typeof sites.$inferSelect;
+
+export async function listSitesByController(db: DB, controllerId: string): Promise<SiteRow[]> {
+  const rows = await db.select().from(sites).where(eq(sites.controllerId, controllerId));
   return rows.map(toSiteRow);
 }
 
-export function listEnabledSitesByController(db: DB, controllerId: string): SiteRow[] {
-  const rows = db
+export async function listEnabledSitesByController(
+  db: DB,
+  controllerId: string,
+): Promise<SiteRow[]> {
+  const rows = await db
     .select()
     .from(sites)
-    .where(and(eq(sites.controllerId, controllerId), eq(sites.enabled, 1)))
-    .all();
+    .where(and(eq(sites.controllerId, controllerId), eq(sites.enabled, true)));
   return rows.map(toSiteRow);
 }
 
-export function listAllSites(db: DB): SiteRow[] {
-  return db.select().from(sites).all().map(toSiteRow);
+export async function listAllSites(db: DB): Promise<SiteRow[]> {
+  const rows = await db.select().from(sites);
+  return rows.map(toSiteRow);
 }
 
-export function upsertSite(
+export async function upsertSite(
   db: DB,
   controllerId: string,
   unifi: { unifiId: string; unifiName: string; displayName?: string },
-): string {
-  const existing = db
+): Promise<string> {
+  const existingRows = await db
     .select()
     .from(sites)
     .where(and(eq(sites.controllerId, controllerId), eq(sites.unifiName, unifi.unifiName)))
-    .get();
+    .limit(1);
+  const existing = existingRows[0];
   if (existing) {
-    db.update(sites)
+    await db
+      .update(sites)
       .set({
         unifiId: unifi.unifiId,
         displayName: unifi.displayName ?? existing.displayName,
       })
-      .where(eq(sites.id, existing.id))
-      .run();
+      .where(eq(sites.id, existing.id));
     return existing.id;
   }
   const id = ulid();
-  db.insert(sites)
-    .values({
-      id,
-      controllerId,
-      unifiId: unifi.unifiId,
-      unifiName: unifi.unifiName,
-      displayName: unifi.displayName ?? unifi.unifiName,
-      city: null,
-      enabled: 1,
-    })
-    .run();
+  await db.insert(sites).values({
+    id,
+    controllerId,
+    unifiId: unifi.unifiId,
+    unifiName: unifi.unifiName,
+    displayName: unifi.displayName ?? unifi.unifiName,
+    city: null,
+    enabled: true,
+  });
   return id;
 }
 
-function toSiteRow(row: {
-  id: string;
-  controllerId: string;
-  unifiId: string;
-  unifiName: string;
-  displayName: string;
-  city: string | null;
-  enabled: number;
-}): SiteRow {
+function toSiteRow(row: SiteRecord): SiteRow {
   return {
     id: row.id,
     controllerId: row.controllerId,
@@ -82,6 +78,6 @@ function toSiteRow(row: {
     unifiName: row.unifiName,
     displayName: row.displayName,
     city: row.city,
-    enabled: row.enabled === 1,
+    enabled: row.enabled,
   };
 }

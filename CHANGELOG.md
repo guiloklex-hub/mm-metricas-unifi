@@ -2,6 +2,49 @@
 
 Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versionamento [SemVer](https://semver.org).
 
+## [2.0.0] — Migração para PostgreSQL + TimescaleDB
+
+### BREAKING CHANGES
+
+- **Banco trocou de SQLite para PostgreSQL 16 + TimescaleDB 2.17+.** Não há
+  migração automática de `app.db` — veja
+  [docs/timescaledb-debian.md §19](docs/timescaledb-debian.md#19-migração-de-dados-desde-a-versão-sqlite)
+  para o caminho de migração de dados (recomendado: subir limpo + backfill via
+  controller UniFi).
+- **Variável `DATABASE_PATH` foi removida.** Substituída por `DATABASE_URL`
+  (connection string Postgres).
+- **Nova variável obrigatória `POSTGRES_PASSWORD`** quando se usa o
+  `docker-compose.yml` default (define o role `metricas_app` no Postgres).
+- **`docker-compose.yml` agora sobe 2 containers** (`metricas-unifi` +
+  `timescaledb`) em vez de 1.
+- Dependência `better-sqlite3` removida; `pg` (`node-postgres`) adicionada.
+
+### Added
+
+- Documento operacional novo [docs/timescaledb-debian.md](docs/timescaledb-debian.md)
+  cobrindo instalação Postgres+Timescale em Debian 12, firewall (ufw/nftables/iptables),
+  pg_hba.conf, TLS, backup com pg_dump/systemd timer, restore, monitoramento e upgrade.
+- Hypertables Timescale automaticamente criadas no boot para todas as tabelas
+  de série temporal (`metrics_5m/1h/1d`, `metrics_vap_*`, `metrics_radio_*`,
+  `metrics_port_*`, `metrics_client_*`) via `runBootstrapSql`.
+- Retention policies declarativas (`add_retention_policy`) substituem (mas
+  coexistem com) o job `purge*` de v1 para purga dos chunks antigos.
+- `FOR UPDATE SKIP LOCKED` no `JobQueue.claimNext` — destrava paralelização
+  futura de workers sem reescrita.
+
+### Changed
+
+- Todas as queries do app agora são async (Promise-based). API HTTP, jobs e
+  rotas atualizados.
+- Colunas booleanas no schema viraram `boolean` real do Postgres (antes eram
+  `integer` 0/1 em SQLite): `enabled`, `insecure_tls`, `is_guest`, `is_wired`,
+  `enable`, `up`, `full_duplex`, `poe_enable`.
+- `ts` permanece `bigint` (epoch seconds) — Timescale aceita BIGINT como time
+  column de hypertable, e isso preserva toda a aritmética de bucketing
+  existente.
+- Testes integration migraram para `testcontainers` + `timescale/timescaledb`
+  (helper em `tests/integration/helpers/test-db.ts`).
+
 ## [Unreleased]
 
 ### Added — nomes de clientes em todo o sistema

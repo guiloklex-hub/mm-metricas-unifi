@@ -1,6 +1,6 @@
 import type { DB } from '@server/db/client.ts';
 import { devices } from '@server/db/schema.ts';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 
 export interface DeviceRow {
@@ -19,6 +19,8 @@ export interface DeviceRow {
   state: number | null;
 }
 
+type DeviceRecord = typeof devices.$inferSelect;
+
 export interface UpsertDeviceInput {
   controllerId: string;
   siteId: string;
@@ -32,14 +34,16 @@ export interface UpsertDeviceInput {
   state?: number | null;
 }
 
-export function upsertDevice(db: DB, input: UpsertDeviceInput): string {
-  const existing = db
+export async function upsertDevice(db: DB, input: UpsertDeviceInput): Promise<string> {
+  const existingRows = await db
     .select()
     .from(devices)
     .where(and(eq(devices.controllerId, input.controllerId), eq(devices.mac, input.mac)))
-    .get();
+    .limit(1);
+  const existing = existingRows[0];
   if (existing) {
-    db.update(devices)
+    await db
+      .update(devices)
       .set({
         name: input.name ?? existing.name,
         model: input.model ?? existing.model,
@@ -50,47 +54,48 @@ export function upsertDevice(db: DB, input: UpsertDeviceInput): string {
         serial: input.serial ?? existing.serial,
         state: input.state ?? existing.state,
       })
-      .where(eq(devices.id, existing.id))
-      .run();
+      .where(eq(devices.id, existing.id));
     return existing.id;
   }
   const id = ulid();
-  db.insert(devices)
-    .values({
-      id,
-      controllerId: input.controllerId,
-      siteId: input.siteId,
-      mac: input.mac,
-      name: input.name,
-      model: input.model,
-      type: input.type,
-      firstSeen: input.seenAt,
-      lastSeen: input.seenAt,
-      version: input.version ?? null,
-      serial: input.serial ?? null,
-      state: input.state ?? null,
-    })
-    .run();
+  await db.insert(devices).values({
+    id,
+    controllerId: input.controllerId,
+    siteId: input.siteId,
+    mac: input.mac,
+    name: input.name,
+    model: input.model,
+    type: input.type,
+    firstSeen: input.seenAt,
+    lastSeen: input.seenAt,
+    version: input.version ?? null,
+    serial: input.serial ?? null,
+    state: input.state ?? null,
+  });
   return id;
 }
 
-export function findDeviceByMac(db: DB, controllerId: string, mac: string): DeviceRow | null {
-  const row = db
+export async function findDeviceByMac(
+  db: DB,
+  controllerId: string,
+  mac: string,
+): Promise<DeviceRow | null> {
+  const rows = await db
     .select()
     .from(devices)
     .where(and(eq(devices.controllerId, controllerId), eq(devices.mac, mac)))
-    .get();
-  if (!row) return null;
-  return toDeviceRow(row);
+    .limit(1);
+  return rows[0] ? toDeviceRow(rows[0]) : null;
 }
 
-export function findDeviceById(db: DB, id: string): DeviceRow | null {
-  const row = db.select().from(devices).where(eq(devices.id, id)).get();
-  return row ? toDeviceRow(row) : null;
+export async function findDeviceById(db: DB, id: string): Promise<DeviceRow | null> {
+  const rows = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
+  return rows[0] ? toDeviceRow(rows[0]) : null;
 }
 
-export function listDevicesBySite(db: DB, siteId: string): DeviceRow[] {
-  return db.select().from(devices).where(eq(devices.siteId, siteId)).all().map(toDeviceRow);
+export async function listDevicesBySite(db: DB, siteId: string): Promise<DeviceRow[]> {
+  const rows = await db.select().from(devices).where(eq(devices.siteId, siteId));
+  return rows.map(toDeviceRow);
 }
 
 export interface ListDevicesFilters {
@@ -98,14 +103,17 @@ export interface ListDevicesFilters {
   siteId?: string;
 }
 
-export function listAllDevices(db: DB, filters: ListDevicesFilters = {}): DeviceRow[] {
+export async function listAllDevices(
+  db: DB,
+  filters: ListDevicesFilters = {},
+): Promise<DeviceRow[]> {
   const conds = [];
   if (filters.controllerId) conds.push(eq(devices.controllerId, filters.controllerId));
   if (filters.siteId) conds.push(eq(devices.siteId, filters.siteId));
   const where = conds.length === 0 ? undefined : conds.length === 1 ? conds[0] : and(...conds);
   const rows = where
-    ? db.select().from(devices).where(where).all()
-    : db.select().from(devices).all();
+    ? await db.select().from(devices).where(where)
+    : await db.select().from(devices);
   return rows.map(toDeviceRow);
 }
 
@@ -113,10 +121,10 @@ export function listAllDevices(db: DB, filters: ListDevicesFilters = {}): Device
  * Atualiza o apelido de um device específico. `null` ou string vazia limpa o
  * apelido. Retorna o número de linhas afetadas (1 = ok, 0 = não encontrado).
  */
-export function setDeviceAlias(db: DB, id: string, alias: string | null): number {
+export async function setDeviceAlias(db: DB, id: string, alias: string | null): Promise<number> {
   const clean = normalizeAlias(alias);
-  const res = db.update(devices).set({ displayAlias: clean }).where(eq(devices.id, id)).run();
-  return res.changes;
+  const res = await db.update(devices).set({ displayAlias: clean }).where(eq(devices.id, id));
+  return res.rowCount ?? 0;
 }
 
 export interface AliasImportEntry {
@@ -149,18 +157,18 @@ export interface AliasImportResult {
  *
  * Tudo numa transação: ou todas as linhas válidas entram, ou nenhuma.
  */
-export function bulkUpsertAliasesByMac(
+export async function bulkUpsertAliasesByMac(
   db: DB,
   entries: AliasImportEntry[],
   filters: { controllerId?: string } = {},
-): AliasImportResult {
+): Promise<AliasImportResult> {
   if (entries.length === 0) return { updated: 0, skipped: 0, errors: [] };
 
   const errors: AliasImportError[] = [];
   let updated = 0;
   let skipped = 0;
 
-  db.$client.transaction(() => {
+  await db.transaction(async (tx) => {
     for (const entry of entries) {
       if (entry.alias != null && entry.alias.length > 120) {
         errors.push({ line: entry.line, mac: entry.mac, reason: 'alias_too_long' });
@@ -169,26 +177,29 @@ export function bulkUpsertAliasesByMac(
       const conds = [eq(devices.mac, entry.mac)];
       if (filters.controllerId) conds.push(eq(devices.controllerId, filters.controllerId));
       const where = conds.length === 1 ? conds[0] : and(...conds);
-      const res = db
+      const res = await tx
         .update(devices)
         .set({ displayAlias: normalizeAlias(entry.alias) })
-        .where(where)
-        .run();
-      if (res.changes > 0) updated += res.changes;
+        .where(where);
+      const changes = res.rowCount ?? 0;
+      if (changes > 0) updated += changes;
       else {
         errors.push({ line: entry.line, mac: entry.mac, reason: 'mac_not_found' });
         skipped += 1;
       }
     }
-  })();
+  });
 
   return { updated, skipped, errors };
 }
 
 /** Conta quantos devices têm apelido custom — útil para mostrar progresso. */
-export function countDevicesWithAlias(db: DB): number {
-  const rows = db.select().from(devices).where(isNotNull(devices.displayAlias)).all();
-  return rows.length;
+export async function countDevicesWithAlias(db: DB): Promise<number> {
+  const result = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(devices)
+    .where(isNotNull(devices.displayAlias));
+  return result[0]?.count ?? 0;
 }
 
 function normalizeAlias(input: string | null | undefined): string | null {
@@ -197,21 +208,7 @@ function normalizeAlias(input: string | null | undefined): string | null {
   return trimmed.length === 0 ? null : trimmed;
 }
 
-function toDeviceRow(row: {
-  id: string;
-  controllerId: string;
-  siteId: string;
-  mac: string;
-  name: string | null;
-  displayAlias: string | null;
-  model: string | null;
-  type: string;
-  firstSeen: number;
-  lastSeen: number | null;
-  version: string | null;
-  serial: string | null;
-  state: number | null;
-}): DeviceRow {
+function toDeviceRow(row: DeviceRecord): DeviceRow {
   return {
     id: row.id,
     controllerId: row.controllerId,

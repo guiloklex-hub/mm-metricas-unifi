@@ -7,6 +7,7 @@
  */
 import type { DB } from '@server/db/client.ts';
 import { insertSamples5m } from '@server/db/queries/metrics-write.ts';
+import { rawGet } from '@server/db/queries/sql-utils.ts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closeTestDb, createTestDb } from './helpers/test-db.ts';
 
@@ -40,35 +41,41 @@ function sample(ts: number, overrides: Record<string, number>) {
     cpuPct: null,
     memPct: null,
     uptimeSec: null,
+    tempCpu: null,
+    tempBoard: null,
     ...overrides,
   } as const;
 }
 
 describe('rate denominator', () => {
   let db: DB;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
   afterEach(() => closeTestDb(db));
 
-  it('usa wifi_tx_attempts como denominador quando disponível', () => {
+  it('usa wifi_tx_attempts como denominador quando disponível', async () => {
     const ts = 1_735_689_600;
     // Primeira amostra: counter inicial (cumulativos). Não gera delta.
-    insertSamples5m(db, [sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 })]);
+    await insertSamples5m(db, [sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 })]);
     // Segunda amostra: cresce. tx_errors > tx_packets (cenário real do UniFi).
-    insertSamples5m(db, [sample(ts + 300, { txPackets: 100, txErrors: 50, wifiTxAttempts: 500 })]);
+    await insertSamples5m(db, [
+      sample(ts + 300, { txPackets: 100, txErrors: 50, wifiTxAttempts: 500 }),
+    ]);
 
-    const row = db.$client
-      .prepare(
-        `SELECT d_tx_packets, d_tx_errors, d_wifi_tx_attempts, error_rate
-         FROM metrics_5m WHERE ts = ?`,
-      )
-      .get(ts + 300) as {
+    const row = await rawGet<{
       d_tx_packets: number;
       d_tx_errors: number;
       d_wifi_tx_attempts: number;
       error_rate: number;
-    };
+    }>(
+      db,
+      `SELECT d_tx_packets, d_tx_errors, d_wifi_tx_attempts, error_rate
+       FROM metrics_5m WHERE ts = ?`,
+      [ts + 300],
+    );
+    expect(row).not.toBeNull();
+    if (!row) return;
     expect(row.d_tx_packets).toBe(100);
     expect(row.d_tx_errors).toBe(50);
     expect(row.d_wifi_tx_attempts).toBe(500);
@@ -77,17 +84,21 @@ describe('rate denominator', () => {
     expect(row.error_rate).toBeCloseTo(0.1, 5);
   });
 
-  it('clampa taxa > 1.0 para 1.0 (proteção contra overshoot)', () => {
+  it('clampa taxa > 1.0 para 1.0 (proteção contra overshoot)', async () => {
     const ts = 1_735_689_600;
     // Caso extremo: counter de errors avança mais que attempts (raro mas
     // possível em janelas onde wifi_tx_attempts atrasa).
-    insertSamples5m(db, [sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 })]);
-    insertSamples5m(db, [sample(ts + 300, { txPackets: 100, txErrors: 200, wifiTxAttempts: 100 })]);
+    await insertSamples5m(db, [sample(ts, { txPackets: 0, txErrors: 0, wifiTxAttempts: 0 })]);
+    await insertSamples5m(db, [
+      sample(ts + 300, { txPackets: 100, txErrors: 200, wifiTxAttempts: 100 }),
+    ]);
 
-    const row = db.$client
-      .prepare(`SELECT error_rate FROM metrics_5m WHERE ts = ?`)
-      .get(ts + 300) as { error_rate: number };
+    const row = await rawGet<{ error_rate: number }>(
+      db,
+      `SELECT error_rate FROM metrics_5m WHERE ts = ?`,
+      [ts + 300],
+    );
     // 200/100 = 2.0, clampado para 1.0
-    expect(row.error_rate).toBe(1);
+    expect(row?.error_rate).toBe(1);
   });
 });

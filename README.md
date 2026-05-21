@@ -2,43 +2,55 @@
 
 Coleta, armazenamento e BI de métricas UniFi — self-hosted, multi-controller, multi-site. Open-source.
 
-Construído para resolver um problema concreto: a interface nova do UniFi Network não mostra mais, por antena, contadores de pacotes/descartes/erros/retransmissão que a diretoria pedia em relatório. Esta ferramenta poll-eia controllers UniFi periodicamente (OS Console + Network Application self-hosted), guarda séries temporais em SQLite e oferece dashboards, relatórios CSV/PDF e comparativos entre filiais.
+Construído para resolver um problema concreto: a interface nova do UniFi Network não mostra mais, por antena, contadores de pacotes/descartes/erros/retransmissão que a diretoria pedia em relatório. Esta ferramenta poll-eia controllers UniFi periodicamente (OS Console + Network Application self-hosted), guarda séries temporais em **PostgreSQL + TimescaleDB** e oferece dashboards, relatórios CSV/PDF e comparativos entre filiais.
 
-> **Status:** v1.0 estável. Pipeline completo de coleta, BI e relatórios pronto para uso em produção self-hosted. Imagem Docker em `ghcr.io/guiloklex-hub/metricas-unifi:latest`.
+> **Status:** v2.0 — migração para TimescaleDB para destravar escala (10+ controllers, backups quentes, replicação). Imagem Docker em `ghcr.io/guiloklex-hub/metricas-unifi:latest`.
 
 ## Funcionalidades planejadas
 
 - Coleta a cada 5 minutos por controller UniFi (OS ou self-hosted)
 - Granularidade: por site, AP, rádio (2.4/5/6 GHz) e cliente
 - Métricas: client count, tx bytes, tx packets, tx dropped, tx errors, tx retries + taxas calculadas (`retry_rate`, `error_rate`, `drop_rate`)
-- Armazenamento local em SQLite (WAL) com downsampling: 5min × 30d → hourly × 1 ano → daily indefinido
+- Armazenamento em PostgreSQL 16 + TimescaleDB com **hypertables** e downsampling: 5min × 30d → hourly × 1 ano → daily indefinido (retention policies declarativas via `add_retention_policy`)
 - **Backfill de histórico**: importa séries já existentes no controller (endpoint `stat/report`) — não é preciso esperar o sistema captar do zero
 - Dashboard BI com gráficos interativos (timeseries, heatmap, comparativos)
 - Exportação CSV (streaming) e PDF (relatório executivo). Suporta ZIP com um CSV por nível (site / antena / rádio / cliente) — colunas legíveis com nome do controller, do site e label "Nome (MAC)" da antena
 - Cadastro de **apelidos** por antena (edição inline ou import em massa via CSV `mac,alias`)
 - Multi-localidade — cadastre quantos controllers quiser
 - Auth single-admin com argon2id, JWT em cookie httpOnly
-- Roda como container Docker único, sem dependências externas (sem Redis, sem Postgres)
+- Deploy em Docker compose (2 containers: app + timescaledb) ou app bare-metal contra um Postgres dedicado em Debian
 
 ## Stack
 
-Node.js 22 · TypeScript · Fastify 5 · Drizzle ORM · better-sqlite3 · Vite + React 19 · TanStack Router/Query · ECharts · PDFKit · undici · Pino · Zod · argon2 · Vitest · Biome.
+Node.js 22 · TypeScript · Fastify 5 · Drizzle ORM (Postgres) · **PostgreSQL 16 + TimescaleDB 2.17+** · Vite + React 19 · TanStack Router/Query · ECharts · PDFKit · undici · Pino · Zod · argon2 · Vitest · Biome.
 
 ## Quick start (Docker)
+
+O `docker-compose.yml` sobe 2 containers: `metricas-unifi` (app) e
+`timescaledb` (Postgres + TimescaleDB).
 
 ```bash
 git clone https://github.com/guiloklex-hub/metricas-unifi.git
 cd metricas-unifi
 cp .env.example .env
 
-# Gere segredos:
+# Senha do role 'metricas_app' no Postgres.
+echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)" >> .env
+
+# Chaves da app.
 echo "MASTER_KEY=$(openssl rand -base64 32)" >> .env
 echo "JWT_SECRET=$(openssl rand -base64 64)" >> .env
+
+# Ajuste DATABASE_URL no .env para usar o POSTGRES_PASSWORD gerado.
 
 docker compose up -d
 ```
 
 Acesse `http://localhost:3000` e siga o setup wizard para definir a senha de admin e cadastrar o primeiro controller.
+
+> **Postgres em host dedicado?** Veja
+> [docs/timescaledb-debian.md](docs/timescaledb-debian.md) para instalação,
+> firewall, TLS e backup em Debian 12.
 
 ## Desenvolvimento local
 
@@ -46,11 +58,14 @@ Acesse `http://localhost:3000` e siga o setup wizard para definir a senha de adm
 nvm use            # Node 22
 npm install
 cp .env.example .env
-# Gerar MASTER_KEY e JWT_SECRET no .env
+# Gerar POSTGRES_PASSWORD, MASTER_KEY e JWT_SECRET no .env
 
-npm run db:generate     # gera migrations Drizzle
-npm run db:migrate      # aplica no SQLite
+# Sobe só o Postgres em container (mais simples que instalar local).
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up timescaledb -d
+
+npm run db:generate     # gera migrations Drizzle (apenas se mudou schema.ts)
 npm run dev             # API + scheduler em http://localhost:3000
+                        # (migrations aplicadas automaticamente no boot)
 npm run dev:web         # Vite SPA em http://localhost:5173 (proxy para 3000)
 ```
 
@@ -76,6 +91,8 @@ npm run dev:web         # Vite SPA em http://localhost:5173 (proxy para 3000)
 
 Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 
+- `DATABASE_URL` — connection string Postgres. Em Docker compose, aponta para o serviço `timescaledb` interno. Em bare-metal, aponta para o Postgres real.
+- `POSTGRES_PASSWORD` — usado pelo docker-compose para criar o role `metricas_app` no Postgres e referenciado em `DATABASE_URL`.
 - `MASTER_KEY` — 32 bytes em base64. Cifra credenciais dos controllers no banco. Trocar invalida senhas guardadas.
 - `JWT_SECRET` — segredo para assinar sessões.
 
@@ -128,6 +145,7 @@ curl http://localhost:3000/api/v1/controllers/{controllerId}/backfill/status -b 
 | Notas das APIs UniFi | [docs/unifi-api-notes.md](docs/unifi-api-notes.md) |
 | Referência de métricas | [docs/metrics-reference.md](docs/metrics-reference.md) |
 | Deploy | [docs/deployment.md](docs/deployment.md) |
+| **TimescaleDB self-hosted em Debian** | [docs/timescaledb-debian.md](docs/timescaledb-debian.md) |
 | ADRs | [docs/adr/](docs/adr/) |
 
 ## Roadmap
@@ -138,6 +156,7 @@ curl http://localhost:3000/api/v1/controllers/{controllerId}/backfill/status -b 
 - [x] **M3 — Relatórios** — CSV streaming, PDF, comparativos
 - [x] **M4 — Beta hardening** — audit log, top talkers, edit/pause controllers, troca de senha
 - [x] **M5 — v1.0** — release pipeline + GHCR estável
+- [x] **M6 — TimescaleDB migration** — escala para 10+ controllers, backups quentes, replicação
 
 Detalhes em [`docs/architecture.md`](docs/architecture.md).
 

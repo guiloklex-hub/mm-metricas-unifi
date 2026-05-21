@@ -5,7 +5,9 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Dependências de build do better-sqlite3 e argon2.
+# `argon2` continua sendo binding nativa que compila no install (node-gyp).
+# `better-sqlite3` foi removida (migração para PostgreSQL/TimescaleDB), mas o
+# toolchain permanece para o argon2.
 RUN apk add --no-cache python3 make g++ && ln -sf python3 /usr/bin/python
 
 COPY package.json package-lock.json* ./
@@ -32,10 +34,11 @@ LABEL org.opencontainers.image.description="Coleta e BI de métricas UniFi"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.source="https://github.com/guiloklex-hub/metricas-unifi"
 
+# DATABASE_URL é OBRIGATÓRIA — sem default. Use `postgresql://user:pass@host:5432/db`.
+# Veja docker-compose.yml ou docs/timescaledb-debian.md.
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000 \
-    DATABASE_PATH=/app/data/app.db
+    PORT=3000
 
 WORKDIR /app
 
@@ -53,6 +56,9 @@ COPY --from=builder --chown=app:app /app/package.json ./package.json
 USER app
 
 EXPOSE 3000
+
+# `/app/data` agora guarda apenas relatórios PDF gerados sob demanda.
+# Os dados de série temporal vivem no PostgreSQL (volume separado).
 VOLUME ["/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

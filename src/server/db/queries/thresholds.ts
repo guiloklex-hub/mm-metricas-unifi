@@ -12,9 +12,10 @@ const KEY = 'thresholds';
 
 let cached: ThresholdConfig | null = null;
 
-export function getThresholds(db: DB): ThresholdConfig {
+export async function getThresholds(db: DB): Promise<ThresholdConfig> {
   if (cached) return cached;
-  const row = db.select().from(appConfig).where(eq(appConfig.key, KEY)).get();
+  const rows = await db.select().from(appConfig).where(eq(appConfig.key, KEY)).limit(1);
+  const row = rows[0];
   if (!row) {
     cached = { ...DEFAULT_THRESHOLDS };
     return cached;
@@ -29,11 +30,11 @@ export function getThresholds(db: DB): ThresholdConfig {
   }
 }
 
-export function saveThresholds(db: DB, t: ThresholdConfig): void {
-  db.insert(appConfig)
+export async function saveThresholds(db: DB, t: ThresholdConfig): Promise<void> {
+  await db
+    .insert(appConfig)
     .values({ key: KEY, value: JSON.stringify(t) })
-    .onConflictDoUpdate({ target: appConfig.key, set: { value: JSON.stringify(t) } })
-    .run();
+    .onConflictDoUpdate({ target: appConfig.key, set: { value: JSON.stringify(t) } });
   cached = { ...t };
 }
 

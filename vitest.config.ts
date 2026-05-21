@@ -18,6 +18,10 @@ export default defineConfig({
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     exclude: ['tests/e2e/**', 'node_modules/**', 'dist/**'],
     setupFiles: ['tests/integration/setup.ts'],
+    // Cold-start de container Postgres+Timescale leva ~3-5s; cada teste tem
+    // que ter folga para isso na primeira chamada de `createTestDb()`.
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

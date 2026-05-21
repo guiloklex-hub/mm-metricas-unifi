@@ -39,21 +39,27 @@ export class Scheduler {
     // Rollup horário (2 min após hora cheia, dá tempo do último bucket fechar).
     this.crons.push(
       new Cron('2 * * * *', { protect: true, name: 'rollup-1h' }, () => {
-        this.queue.enqueue('rollup_1h', null, undefined, { idempotencyKey: hourBucketKey() });
+        this.queue
+          .enqueue('rollup_1h', null, undefined, { idempotencyKey: hourBucketKey() })
+          .catch((err) => this.logger.error({ err }, 'enqueue rollup_1h falhou'));
       }),
     );
 
     // Rollup diário às 00:10 UTC.
     this.crons.push(
       new Cron('10 0 * * *', { protect: true, name: 'rollup-1d' }, () => {
-        this.queue.enqueue('rollup_1d', null, undefined, { idempotencyKey: dayBucketKey() });
+        this.queue
+          .enqueue('rollup_1d', null, undefined, { idempotencyKey: dayBucketKey() })
+          .catch((err) => this.logger.error({ err }, 'enqueue rollup_1d falhou'));
       }),
     );
 
     // Retention às 03:00 UTC.
     this.crons.push(
       new Cron('0 3 * * *', { protect: true, name: 'retention' }, () => {
-        this.queue.enqueue('retention', null, undefined, { idempotencyKey: dayBucketKey() });
+        this.queue
+          .enqueue('retention', null, undefined, { idempotencyKey: dayBucketKey() })
+          .catch((err) => this.logger.error({ err }, 'enqueue retention falhou'));
       }),
     );
 
@@ -77,7 +83,7 @@ export class Scheduler {
         lastSeenAt: controllers.lastSeenAt,
       })
       .from(controllers)
-      .where(eq(controllers.enabled, 1));
+      .where(eq(controllers.enabled, true));
 
     const now = Date.now();
     let enqueued = 0;
@@ -85,7 +91,7 @@ export class Scheduler {
       const lastMs = c.lastSeenAt ?? 0;
       const intervalMs = c.pollSeconds * 1000;
       if (now - lastMs < intervalMs) continue;
-      const jobId = this.queue.enqueue('collect', { controllerId: c.id }, undefined, {
+      const jobId = await this.queue.enqueue('collect', { controllerId: c.id }, undefined, {
         idempotencyKey: c.id,
       });
       if (jobId) enqueued += 1;

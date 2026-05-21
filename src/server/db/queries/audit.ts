@@ -26,17 +26,15 @@ export interface AuditEntry {
   metadata?: Record<string, unknown>;
 }
 
-export function logAudit(db: DB, entry: AuditEntry): void {
+export async function logAudit(db: DB, entry: AuditEntry): Promise<void> {
   try {
-    db.insert(auditLog)
-      .values({
-        ts: Math.floor(Date.now() / 1000),
-        actor: entry.actor ?? null,
-        action: entry.action,
-        target: entry.target ?? null,
-        metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
-      })
-      .run();
+    await db.insert(auditLog).values({
+      ts: Math.floor(Date.now() / 1000),
+      actor: entry.actor ?? null,
+      action: entry.action,
+      target: entry.target ?? null,
+      metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
+    });
   } catch {
     // Audit é best-effort — não derruba a request se algo der errado.
   }
@@ -51,11 +49,14 @@ export interface AuditRow {
   metadata: Record<string, unknown> | null;
 }
 
-export function listAuditLog(db: DB, opts: { limit?: number; beforeTs?: number } = {}): AuditRow[] {
+export async function listAuditLog(
+  db: DB,
+  opts: { limit?: number; beforeTs?: number } = {},
+): Promise<AuditRow[]> {
   const limit = Math.min(opts.limit ?? 50, 500);
   let query = db.select().from(auditLog).$dynamic();
   if (opts.beforeTs) query = query.where(lt(auditLog.ts, opts.beforeTs));
-  const rows = query.orderBy(desc(auditLog.ts)).limit(limit).all();
+  const rows = await query.orderBy(desc(auditLog.ts)).limit(limit);
   return rows.map((r) => ({
     id: r.id,
     ts: r.ts,

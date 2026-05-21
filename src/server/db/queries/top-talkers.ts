@@ -1,4 +1,5 @@
 import type { DB } from '@server/db/client.ts';
+import { rawAll } from './sql-utils.ts';
 
 export interface TopTalker {
   clientMac: string;
@@ -25,7 +26,7 @@ export interface TopTalkersArgs {
  * `clients` para trazer hostname/name/alias junto — clients ainda não
  * catalogados (raríssimo, só no primeiro ciclo) permanecem só com MAC.
  */
-export function listTopTalkers(db: DB, args: TopTalkersArgs): TopTalker[] {
+export async function listTopTalkers(db: DB, args: TopTalkersArgs): Promise<TopTalker[]> {
   const where: string[] = ["m.client_mac <> ''", 'm.ts >= ?', 'm.ts <= ?'];
   const params: Array<string | number> = [args.from, args.to];
   if (args.controllerId) {
@@ -45,16 +46,16 @@ export function listTopTalkers(db: DB, args: TopTalkersArgs): TopTalker[] {
       c.hostname AS hostname,
       c.name AS name,
       c.display_alias AS displayAlias,
-      SUM(COALESCE(m.d_tx_bytes, 0)) AS totalBytes,
-      SUM(COALESCE(m.d_tx_packets, 0)) AS totalPackets,
-      COUNT(*) AS samples
+      COALESCE(SUM(COALESCE(m.d_tx_bytes, 0)), 0)::bigint AS totalBytes,
+      COALESCE(SUM(COALESCE(m.d_tx_packets, 0)), 0)::bigint AS totalPackets,
+      COUNT(*)::int AS samples
     FROM metrics_5m m
     LEFT JOIN clients c
       ON c.controller_id = m.controller_id AND c.mac = m.client_mac
     WHERE ${where.join(' AND ')}
-    GROUP BY clientMac, controllerId, siteId, hostname, name, displayAlias
-    ORDER BY totalBytes DESC
+    GROUP BY m.client_mac, m.controller_id, m.site_id, c.hostname, c.name, c.display_alias
+    ORDER BY SUM(COALESCE(m.d_tx_bytes, 0)) DESC NULLS LAST
     LIMIT ?`;
   params.push(limit);
-  return db.$client.prepare(sql).all(...params) as TopTalker[];
+  return rawAll<TopTalker>(db, sql, params);
 }

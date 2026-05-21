@@ -1,11 +1,11 @@
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   schema: './src/server/db/schema.ts',
   out: './drizzle',
   dbCredentials: {
-    url: process.env.DATABASE_PATH ?? './data/app.db',
+    url: process.env.DATABASE_URL ?? 'postgresql://localhost:5432/metricas_unifi',
   },
   verbose: true,
   strict: true,

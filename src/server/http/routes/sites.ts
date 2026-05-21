@@ -10,14 +10,14 @@ export async function registerSiteRoutes(app: FastifyInstance, db: DB): Promise<
   app.get('/api/v1/sites', { preHandler: app.requireAdmin() }, async (req) => {
     const query = queryControllerSchema.parse(req.query);
     const sites = query.controllerId
-      ? listSitesByController(db, query.controllerId)
-      : listAllSites(db);
+      ? await listSitesByController(db, query.controllerId)
+      : await listAllSites(db);
     return { ok: true, data: sites };
   });
 
   app.get('/api/v1/sites/:id/devices', { preHandler: app.requireAdmin() }, async (req) => {
     const { id } = z.object({ id: z.string().min(1).max(64) }).parse(req.params);
-    const devices = listDevicesBySite(db, id);
+    const devices = await listDevicesBySite(db, id);
     return { ok: true, data: devices };
   });
 }

@@ -1,18 +1,30 @@
-import { sql } from 'drizzle-orm';
 import {
-  blob,
+  bigint,
+  bigserial,
+  boolean,
+  customType,
+  doublePrecision,
   index,
   integer,
+  pgTable,
   primaryKey,
-  real,
-  sqliteTable,
   text,
   uniqueIndex,
-} from 'drizzle-orm/sqlite-core';
+} from 'drizzle-orm/pg-core';
+
+/**
+ * `bytea` customizado para campos binários (senhas e API keys cifradas).
+ * O driver `pg` aceita `Buffer` direto na escrita e devolve `Buffer` na leitura.
+ */
+const bytea = customType<{ data: Buffer; driverData: Buffer; default: false }>({
+  dataType() {
+    return 'bytea';
+  },
+});
 
 /* ---------- Catálogo ---------- */
 
-export const controllers = sqliteTable(
+export const controllers = pgTable(
   'controllers',
   {
     id: text('id').primaryKey(),
@@ -21,22 +33,22 @@ export const controllers = sqliteTable(
     variant: text('variant'),
     authMode: text('auth_mode').notNull(),
     username: text('username'),
-    passwordEnc: blob('password_enc', { mode: 'buffer' }),
-    apiKeyEnc: blob('api_key_enc', { mode: 'buffer' }),
-    insecureTls: integer('insecure_tls').notNull().default(0),
+    passwordEnc: bytea('password_enc'),
+    apiKeyEnc: bytea('api_key_enc'),
+    insecureTls: boolean('insecure_tls').notNull().default(false),
     pollSeconds: integer('poll_seconds').notNull().default(300),
-    enabled: integer('enabled').notNull().default(1),
-    lastSeenAt: integer('last_seen_at'),
+    enabled: boolean('enabled').notNull().default(true),
+    lastSeenAt: bigint('last_seen_at', { mode: 'number' }),
     lastError: text('last_error'),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },
   (t) => ({
     nameUnique: uniqueIndex('controllers_name_unique').on(t.name),
   }),
 );
 
-export const sites = sqliteTable(
+export const sites = pgTable(
   'sites',
   {
     id: text('id').primaryKey(),
@@ -47,7 +59,7 @@ export const sites = sqliteTable(
     unifiName: text('unifi_name').notNull(),
     displayName: text('display_name').notNull(),
     city: text('city'),
-    enabled: integer('enabled').notNull().default(1),
+    enabled: boolean('enabled').notNull().default(true),
   },
   (t) => ({
     ctrlNameUnique: uniqueIndex('sites_controller_name_unique').on(t.controllerId, t.unifiName),
@@ -55,7 +67,7 @@ export const sites = sqliteTable(
   }),
 );
 
-export const clients = sqliteTable(
+export const clients = pgTable(
   'clients',
   {
     id: text('id').primaryKey(),
@@ -72,8 +84,8 @@ export const clients = sqliteTable(
     name: text('name'),
     /** Apelido sobrescrito pelo operador no nosso sistema. Vence `name`. */
     displayAlias: text('display_alias'),
-    firstSeen: integer('first_seen').notNull(),
-    lastSeen: integer('last_seen'),
+    firstSeen: bigint('first_seen', { mode: 'number' }).notNull(),
+    lastSeen: bigint('last_seen', { mode: 'number' }),
   },
   (t) => ({
     ctrlMacUnique: uniqueIndex('clients_controller_mac_unique').on(t.controllerId, t.mac),
@@ -82,7 +94,7 @@ export const clients = sqliteTable(
   }),
 );
 
-export const devices = sqliteTable(
+export const devices = pgTable(
   'devices',
   {
     id: text('id').primaryKey(),
@@ -98,13 +110,13 @@ export const devices = sqliteTable(
     displayAlias: text('display_alias'),
     model: text('model'),
     type: text('type').notNull(),
-    firstSeen: integer('first_seen').notNull(),
-    lastSeen: integer('last_seen'),
+    firstSeen: bigint('first_seen', { mode: 'number' }).notNull(),
+    lastSeen: bigint('last_seen', { mode: 'number' }),
     /** Versão de firmware reportada pelo controller (ex: "6.6.74.15103"). */
     version: text('version'),
     /** Serial number do hardware — útil para inventário / RMA. */
     serial: text('serial'),
-    /** Estado conforme reportado pelo UniFi: 1=connected, 0=disconnected. */
+    /** Estado conforme reportado pelo UniFi: 1=connected, 0=disconnected. Mantido int (pode ser null e vem como número). */
     state: integer('state'),
   },
   (t) => ({
@@ -117,61 +129,61 @@ export const devices = sqliteTable(
 /* ---------- Séries temporais ----------
  *
  * Dimensões nullable usam sentinela `''` (string vazia) em vez de NULL para
- * permitir uniqueness composta e ON CONFLICT (SQLite trata NULL != NULL em
- * índices únicos). API converte ''→null no boundary.
+ * permitir uniqueness composta e ON CONFLICT (Postgres trata NULL != NULL em
+ * índices únicos da mesma forma). API converte ''→null no boundary.
  */
 
 const metricsColumns = {
-  ts: integer('ts').notNull(),
+  ts: bigint('ts', { mode: 'number' }).notNull(),
   controllerId: text('controller_id').notNull(),
   siteId: text('site_id').notNull(),
   deviceId: text('device_id').notNull().default(''),
   radio: text('radio').notNull().default(''),
   clientMac: text('client_mac').notNull().default(''),
   clientCount: integer('client_count'),
-  txBytes: integer('tx_bytes'),
-  txPackets: integer('tx_packets'),
-  txDropped: integer('tx_dropped'),
-  txErrors: integer('tx_errors'),
-  txRetries: integer('tx_retries'),
-  rxBytes: integer('rx_bytes'),
-  rxPackets: integer('rx_packets'),
-  rxDropped: integer('rx_dropped'),
-  rxErrors: integer('rx_errors'),
-  dTxBytes: integer('d_tx_bytes'),
-  dTxPackets: integer('d_tx_packets'),
-  dTxDropped: integer('d_tx_dropped'),
-  dTxErrors: integer('d_tx_errors'),
-  dTxRetries: integer('d_tx_retries'),
-  dRxBytes: integer('d_rx_bytes'),
-  dRxPackets: integer('d_rx_packets'),
-  dRxDropped: integer('d_rx_dropped'),
-  dRxErrors: integer('d_rx_errors'),
+  txBytes: bigint('tx_bytes', { mode: 'number' }),
+  txPackets: bigint('tx_packets', { mode: 'number' }),
+  txDropped: bigint('tx_dropped', { mode: 'number' }),
+  txErrors: bigint('tx_errors', { mode: 'number' }),
+  txRetries: bigint('tx_retries', { mode: 'number' }),
+  rxBytes: bigint('rx_bytes', { mode: 'number' }),
+  rxPackets: bigint('rx_packets', { mode: 'number' }),
+  rxDropped: bigint('rx_dropped', { mode: 'number' }),
+  rxErrors: bigint('rx_errors', { mode: 'number' }),
+  dTxBytes: bigint('d_tx_bytes', { mode: 'number' }),
+  dTxPackets: bigint('d_tx_packets', { mode: 'number' }),
+  dTxDropped: bigint('d_tx_dropped', { mode: 'number' }),
+  dTxErrors: bigint('d_tx_errors', { mode: 'number' }),
+  dTxRetries: bigint('d_tx_retries', { mode: 'number' }),
+  dRxBytes: bigint('d_rx_bytes', { mode: 'number' }),
+  dRxPackets: bigint('d_rx_packets', { mode: 'number' }),
+  dRxDropped: bigint('d_rx_dropped', { mode: 'number' }),
+  dRxErrors: bigint('d_rx_errors', { mode: 'number' }),
   // Contadores adicionais (cumulativos) e seus deltas.
-  wifiTxAttempts: integer('wifi_tx_attempts'),
-  wifiTxDropped: integer('wifi_tx_dropped'),
-  rxCrypts: integer('rx_crypts'),
-  macFilterRejections: integer('mac_filter_rejections'),
-  numRoamEvents: integer('num_roam_events'),
-  dWifiTxAttempts: integer('d_wifi_tx_attempts'),
-  dWifiTxDropped: integer('d_wifi_tx_dropped'),
-  dRxCrypts: integer('d_rx_crypts'),
-  dMacFilterRejections: integer('d_mac_filter_rejections'),
-  dNumRoamEvents: integer('d_num_roam_events'),
+  wifiTxAttempts: bigint('wifi_tx_attempts', { mode: 'number' }),
+  wifiTxDropped: bigint('wifi_tx_dropped', { mode: 'number' }),
+  rxCrypts: bigint('rx_crypts', { mode: 'number' }),
+  macFilterRejections: bigint('mac_filter_rejections', { mode: 'number' }),
+  numRoamEvents: bigint('num_roam_events', { mode: 'number' }),
+  dWifiTxAttempts: bigint('d_wifi_tx_attempts', { mode: 'number' }),
+  dWifiTxDropped: bigint('d_wifi_tx_dropped', { mode: 'number' }),
+  dRxCrypts: bigint('d_rx_crypts', { mode: 'number' }),
+  dMacFilterRejections: bigint('d_mac_filter_rejections', { mode: 'number' }),
+  dNumRoamEvents: bigint('d_num_roam_events', { mode: 'number' }),
   // Gauges (não-cumulativos).
-  cpuPct: real('cpu_pct'),
-  memPct: real('mem_pct'),
-  uptimeSec: integer('uptime_sec'),
+  cpuPct: doublePrecision('cpu_pct'),
+  memPct: doublePrecision('mem_pct'),
+  uptimeSec: bigint('uptime_sec', { mode: 'number' }),
   /** Temperatura da CPU/SoC do device, °C. Somente APs/switches que expõem. */
-  tempCpu: real('temp_cpu'),
+  tempCpu: doublePrecision('temp_cpu'),
   /** Temperatura do board/PHY, °C. */
-  tempBoard: real('temp_board'),
-  retryRate: real('retry_rate'),
-  errorRate: real('error_rate'),
-  dropRate: real('drop_rate'),
+  tempBoard: doublePrecision('temp_board'),
+  retryRate: doublePrecision('retry_rate'),
+  errorRate: doublePrecision('error_rate'),
+  dropRate: doublePrecision('drop_rate'),
 };
 
-export const metrics5m = sqliteTable('metrics_5m', metricsColumns, (t) => ({
+export const metrics5m = pgTable('metrics_5m', metricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_5m_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -186,7 +198,7 @@ export const metrics5m = sqliteTable('metrics_5m', metricsColumns, (t) => ({
   controllerTs: index('metrics_5m_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metrics1h = sqliteTable('metrics_1h', metricsColumns, (t) => ({
+export const metrics1h = pgTable('metrics_1h', metricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_1h_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -200,7 +212,7 @@ export const metrics1h = sqliteTable('metrics_1h', metricsColumns, (t) => ({
   controllerTs: index('metrics_1h_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metrics1d = sqliteTable('metrics_1d', metricsColumns, (t) => ({
+export const metrics1d = pgTable('metrics_1d', metricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_1d_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -216,36 +228,36 @@ export const metrics1d = sqliteTable('metrics_1d', metricsColumns, (t) => ({
 
 /* ---------- Operacional ---------- */
 
-export const jobs = sqliteTable(
+export const jobs = pgTable(
   'jobs',
   {
     id: text('id').primaryKey(),
     kind: text('kind').notNull(),
     payloadJson: text('payload_json'),
-    runAt: integer('run_at').notNull(),
+    runAt: bigint('run_at', { mode: 'number' }).notNull(),
     status: text('status').notNull().default('pending'),
     attempts: integer('attempts').notNull().default(0),
     maxAttempts: integer('max_attempts').notNull().default(5),
-    lockedUntil: integer('locked_until'),
+    lockedUntil: bigint('locked_until', { mode: 'number' }),
     lastError: text('last_error'),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
   },
   (t) => ({
     claimIdx: index('jobs_claim_idx').on(t.status, t.runAt, t.lockedUntil),
   }),
 );
 
-export const appConfig = sqliteTable('app_config', {
+export const appConfig = pgTable('app_config', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
 });
 
-export const auditLog = sqliteTable(
+export const auditLog = pgTable(
   'audit_log',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    ts: integer('ts').notNull(),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    ts: bigint('ts', { mode: 'number' }).notNull(),
     actor: text('actor'),
     action: text('action').notNull(),
     target: text('target'),
@@ -256,7 +268,7 @@ export const auditLog = sqliteTable(
   }),
 );
 
-export const counterState = sqliteTable(
+export const counterState = pgTable(
   'counter_state',
   {
     controllerId: text('controller_id').notNull(),
@@ -266,8 +278,8 @@ export const counterState = sqliteTable(
     clientMac: text('client_mac').notNull().default(''),
     ssid: text('ssid').notNull().default(''),
     metric: text('metric').notNull(),
-    lastValue: integer('last_value').notNull(),
-    lastTs: integer('last_ts').notNull(),
+    lastValue: bigint('last_value', { mode: 'number' }).notNull(),
+    lastTs: bigint('last_ts', { mode: 'number' }).notNull(),
   },
   (t) => ({
     pk: primaryKey({
@@ -280,7 +292,7 @@ export const counterState = sqliteTable(
 /* ---------- Séries temporais por VAP (SSID × rádio) ---------- */
 
 const vapMetricsColumns = {
-  ts: integer('ts').notNull(),
+  ts: bigint('ts', { mode: 'number' }).notNull(),
   controllerId: text('controller_id').notNull(),
   siteId: text('site_id').notNull(),
   deviceId: text('device_id').notNull(),
@@ -288,34 +300,34 @@ const vapMetricsColumns = {
   ssid: text('ssid').notNull(),
   /** Clientes conectados nesse VAP (gauge, snapshot). */
   numSta: integer('num_sta'),
-  /** 1 se rede guest, 0 caso contrário. */
-  isGuest: integer('is_guest'),
+  /** Rede guest. */
+  isGuest: boolean('is_guest'),
   /** Sinal médio dos clientes conectados (dBm, geralmente negativo). */
-  avgClientSignal: real('avg_client_signal'),
+  avgClientSignal: doublePrecision('avg_client_signal'),
   /** Counters cumulativos. */
-  txBytes: integer('tx_bytes'),
-  rxBytes: integer('rx_bytes'),
-  txPackets: integer('tx_packets'),
-  rxPackets: integer('rx_packets'),
-  txRetries: integer('tx_retries'),
-  txDropped: integer('tx_dropped'),
-  rxDropped: integer('rx_dropped'),
-  macFilterRejections: integer('mac_filter_rejections'),
+  txBytes: bigint('tx_bytes', { mode: 'number' }),
+  rxBytes: bigint('rx_bytes', { mode: 'number' }),
+  txPackets: bigint('tx_packets', { mode: 'number' }),
+  rxPackets: bigint('rx_packets', { mode: 'number' }),
+  txRetries: bigint('tx_retries', { mode: 'number' }),
+  txDropped: bigint('tx_dropped', { mode: 'number' }),
+  rxDropped: bigint('rx_dropped', { mode: 'number' }),
+  macFilterRejections: bigint('mac_filter_rejections', { mode: 'number' }),
   /** Métricas de qualidade nativas do UniFi (0-100). */
-  ccq: real('ccq'),
-  satisfaction: real('satisfaction'),
+  ccq: doublePrecision('ccq'),
+  satisfaction: doublePrecision('satisfaction'),
   /** Deltas calculados via counter_state. */
-  dTxBytes: integer('d_tx_bytes'),
-  dRxBytes: integer('d_rx_bytes'),
-  dTxPackets: integer('d_tx_packets'),
-  dRxPackets: integer('d_rx_packets'),
-  dTxRetries: integer('d_tx_retries'),
-  dTxDropped: integer('d_tx_dropped'),
-  dRxDropped: integer('d_rx_dropped'),
-  dMacFilterRejections: integer('d_mac_filter_rejections'),
+  dTxBytes: bigint('d_tx_bytes', { mode: 'number' }),
+  dRxBytes: bigint('d_rx_bytes', { mode: 'number' }),
+  dTxPackets: bigint('d_tx_packets', { mode: 'number' }),
+  dRxPackets: bigint('d_rx_packets', { mode: 'number' }),
+  dTxRetries: bigint('d_tx_retries', { mode: 'number' }),
+  dTxDropped: bigint('d_tx_dropped', { mode: 'number' }),
+  dRxDropped: bigint('d_rx_dropped', { mode: 'number' }),
+  dMacFilterRejections: bigint('d_mac_filter_rejections', { mode: 'number' }),
 };
 
-export const metricsVap5m = sqliteTable('metrics_vap_5m', vapMetricsColumns, (t) => ({
+export const metricsVap5m = pgTable('metrics_vap_5m', vapMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_vap_5m_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -329,7 +341,7 @@ export const metricsVap5m = sqliteTable('metrics_vap_5m', vapMetricsColumns, (t)
   controllerTs: index('metrics_vap_5m_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metricsVap1h = sqliteTable('metrics_vap_1h', vapMetricsColumns, (t) => ({
+export const metricsVap1h = pgTable('metrics_vap_1h', vapMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_vap_1h_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -343,7 +355,7 @@ export const metricsVap1h = sqliteTable('metrics_vap_1h', vapMetricsColumns, (t)
   controllerTs: index('metrics_vap_1h_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metricsVap1d = sqliteTable('metrics_vap_1d', vapMetricsColumns, (t) => ({
+export const metricsVap1d = pgTable('metrics_vap_1d', vapMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_vap_1d_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -360,7 +372,7 @@ export const metricsVap1d = sqliteTable('metrics_vap_1d', vapMetricsColumns, (t)
 /* ---------- Séries temporais por rádio (canal, util, power) ---------- */
 
 const radioMetricsColumns = {
-  ts: integer('ts').notNull(),
+  ts: bigint('ts', { mode: 'number' }).notNull(),
   controllerId: text('controller_id').notNull(),
   siteId: text('site_id').notNull(),
   deviceId: text('device_id').notNull(),
@@ -374,13 +386,13 @@ const radioMetricsColumns = {
   userNumSta: integer('user_num_sta'),
   guestNumSta: integer('guest_num_sta'),
   /** Utilização total do canal (0-100). Métrica-chave de congestionamento. */
-  cuTotal: real('cu_total'),
-  cuSelfTx: real('cu_self_tx'),
-  cuSelfRx: real('cu_self_rx'),
-  satisfaction: real('satisfaction'),
+  cuTotal: doublePrecision('cu_total'),
+  cuSelfTx: doublePrecision('cu_self_tx'),
+  cuSelfRx: doublePrecision('cu_self_rx'),
+  satisfaction: doublePrecision('satisfaction'),
 };
 
-export const metricsRadio5m = sqliteTable('metrics_radio_5m', radioMetricsColumns, (t) => ({
+export const metricsRadio5m = pgTable('metrics_radio_5m', radioMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_radio_5m_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -392,7 +404,7 @@ export const metricsRadio5m = sqliteTable('metrics_radio_5m', radioMetricsColumn
   controllerTs: index('metrics_radio_5m_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metricsRadio1h = sqliteTable('metrics_radio_1h', radioMetricsColumns, (t) => ({
+export const metricsRadio1h = pgTable('metrics_radio_1h', radioMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_radio_1h_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -404,7 +416,7 @@ export const metricsRadio1h = sqliteTable('metrics_radio_1h', radioMetricsColumn
   controllerTs: index('metrics_radio_1h_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metricsRadio1d = sqliteTable('metrics_radio_1d', radioMetricsColumns, (t) => ({
+export const metricsRadio1d = pgTable('metrics_radio_1d', radioMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_radio_1d_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -419,7 +431,7 @@ export const metricsRadio1d = sqliteTable('metrics_radio_1d', radioMetricsColumn
 /* ---------- Séries temporais por cliente WiFi (cobertura) ---------- */
 
 const clientMetricsColumns = {
-  ts: integer('ts').notNull(),
+  ts: bigint('ts', { mode: 'number' }).notNull(),
   controllerId: text('controller_id').notNull(),
   siteId: text('site_id').notNull(),
   /** ID do AP do nosso catálogo (pode ser '' se cliente não está em AP conhecido). */
@@ -429,24 +441,24 @@ const clientMetricsColumns = {
   radio: text('radio').notNull().default(''),
   /** Gauges — rollup = AVG. */
   channel: integer('channel'),
-  signal: real('signal'),
-  noise: real('noise'),
-  txRateKbps: integer('tx_rate_kbps'),
-  rxRateKbps: integer('rx_rate_kbps'),
+  signal: doublePrecision('signal'),
+  noise: doublePrecision('noise'),
+  txRateKbps: bigint('tx_rate_kbps', { mode: 'number' }),
+  rxRateKbps: bigint('rx_rate_kbps', { mode: 'number' }),
   /** Snapshot — rollup = LAST/MAX. */
-  idleTime: integer('idle_time'),
+  idleTime: bigint('idle_time', { mode: 'number' }),
   roamCount: integer('roam_count'),
-  isGuest: integer('is_guest'),
-  isWired: integer('is_wired'),
-  uptimeSec: integer('uptime_sec'),
+  isGuest: boolean('is_guest'),
+  isWired: boolean('is_wired'),
+  uptimeSec: bigint('uptime_sec', { mode: 'number' }),
   /** Counters (não viram delta aqui — cliente entra/sai do AP frequentemente). */
-  txBytes: integer('tx_bytes'),
-  rxBytes: integer('rx_bytes'),
-  txRetries: integer('tx_retries'),
-  rxRetries: integer('rx_retries'),
+  txBytes: bigint('tx_bytes', { mode: 'number' }),
+  rxBytes: bigint('rx_bytes', { mode: 'number' }),
+  txRetries: bigint('tx_retries', { mode: 'number' }),
+  rxRetries: bigint('rx_retries', { mode: 'number' }),
 };
 
-export const metricsClient5m = sqliteTable('metrics_client_5m', clientMetricsColumns, (t) => ({
+export const metricsClient5m = pgTable('metrics_client_5m', clientMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_client_5m_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -458,7 +470,7 @@ export const metricsClient5m = sqliteTable('metrics_client_5m', clientMetricsCol
   clientTs: index('metrics_client_5m_client_ts').on(t.clientMac, t.ts),
 }));
 
-export const metricsClient1h = sqliteTable('metrics_client_1h', clientMetricsColumns, (t) => ({
+export const metricsClient1h = pgTable('metrics_client_1h', clientMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_client_1h_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -472,40 +484,40 @@ export const metricsClient1h = sqliteTable('metrics_client_1h', clientMetricsCol
 /* ---------- Séries temporais por porta de switch ---------- */
 
 const portMetricsColumns = {
-  ts: integer('ts').notNull(),
+  ts: bigint('ts', { mode: 'number' }).notNull(),
   controllerId: text('controller_id').notNull(),
   siteId: text('site_id').notNull(),
   deviceId: text('device_id').notNull(),
   portIdx: integer('port_idx').notNull(),
   name: text('name'),
-  enable: integer('enable'),
-  up: integer('up'),
+  enable: boolean('enable'),
+  up: boolean('up'),
   speed: integer('speed'),
-  fullDuplex: integer('full_duplex'),
-  poeEnable: integer('poe_enable'),
-  poePower: real('poe_power'),
-  poeVoltage: real('poe_voltage'),
+  fullDuplex: boolean('full_duplex'),
+  poeEnable: boolean('poe_enable'),
+  poePower: doublePrecision('poe_power'),
+  poeVoltage: doublePrecision('poe_voltage'),
   /** Counters cumulativos. */
-  txBytes: integer('tx_bytes'),
-  rxBytes: integer('rx_bytes'),
-  txPackets: integer('tx_packets'),
-  rxPackets: integer('rx_packets'),
-  txErrors: integer('tx_errors'),
-  rxErrors: integer('rx_errors'),
-  txDropped: integer('tx_dropped'),
-  rxDropped: integer('rx_dropped'),
+  txBytes: bigint('tx_bytes', { mode: 'number' }),
+  rxBytes: bigint('rx_bytes', { mode: 'number' }),
+  txPackets: bigint('tx_packets', { mode: 'number' }),
+  rxPackets: bigint('rx_packets', { mode: 'number' }),
+  txErrors: bigint('tx_errors', { mode: 'number' }),
+  rxErrors: bigint('rx_errors', { mode: 'number' }),
+  txDropped: bigint('tx_dropped', { mode: 'number' }),
+  rxDropped: bigint('rx_dropped', { mode: 'number' }),
   /** Deltas calculados via counter_state. */
-  dTxBytes: integer('d_tx_bytes'),
-  dRxBytes: integer('d_rx_bytes'),
-  dTxPackets: integer('d_tx_packets'),
-  dRxPackets: integer('d_rx_packets'),
-  dTxErrors: integer('d_tx_errors'),
-  dRxErrors: integer('d_rx_errors'),
-  dTxDropped: integer('d_tx_dropped'),
-  dRxDropped: integer('d_rx_dropped'),
+  dTxBytes: bigint('d_tx_bytes', { mode: 'number' }),
+  dRxBytes: bigint('d_rx_bytes', { mode: 'number' }),
+  dTxPackets: bigint('d_tx_packets', { mode: 'number' }),
+  dRxPackets: bigint('d_rx_packets', { mode: 'number' }),
+  dTxErrors: bigint('d_tx_errors', { mode: 'number' }),
+  dRxErrors: bigint('d_rx_errors', { mode: 'number' }),
+  dTxDropped: bigint('d_tx_dropped', { mode: 'number' }),
+  dRxDropped: bigint('d_rx_dropped', { mode: 'number' }),
 };
 
-export const metricsPort5m = sqliteTable('metrics_port_5m', portMetricsColumns, (t) => ({
+export const metricsPort5m = pgTable('metrics_port_5m', portMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_port_5m_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -517,7 +529,7 @@ export const metricsPort5m = sqliteTable('metrics_port_5m', portMetricsColumns, 
   controllerTs: index('metrics_port_5m_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metricsPort1h = sqliteTable('metrics_port_1h', portMetricsColumns, (t) => ({
+export const metricsPort1h = pgTable('metrics_port_1h', portMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_port_1h_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -529,7 +541,7 @@ export const metricsPort1h = sqliteTable('metrics_port_1h', portMetricsColumns, 
   controllerTs: index('metrics_port_1h_controller_ts').on(t.controllerId, t.ts),
 }));
 
-export const metricsPort1d = sqliteTable('metrics_port_1d', portMetricsColumns, (t) => ({
+export const metricsPort1d = pgTable('metrics_port_1d', portMetricsColumns, (t) => ({
   uniqueDim: uniqueIndex('metrics_port_1d_dim_unique').on(
     t.ts,
     t.controllerId,
@@ -543,11 +555,11 @@ export const metricsPort1d = sqliteTable('metrics_port_1d', portMetricsColumns, 
 
 /* ---------- Eventos UniFi ---------- */
 
-export const events = sqliteTable(
+export const events = pgTable(
   'events',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    ts: integer('ts').notNull(),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    ts: bigint('ts', { mode: 'number' }).notNull(),
     controllerId: text('controller_id').notNull(),
     siteId: text('site_id').notNull(),
     /** Fingerprint para idempotência (UPSERT). */
@@ -570,14 +582,3 @@ export const events = sqliteTable(
     controllerTs: index('events_controller_ts').on(t.controllerId, t.ts),
   }),
 );
-
-/**
- * SQL extra rodado pelo client em todo startup (PRAGMAs idempotentes).
- * As migrations DDL ficam em `drizzle/` geradas via `drizzle-kit generate`.
- */
-export const POST_MIGRATE_SQL = sql`
-  PRAGMA journal_mode = WAL;
-  PRAGMA synchronous = NORMAL;
-  PRAGMA foreign_keys = ON;
-  PRAGMA busy_timeout = 5000;
-`;

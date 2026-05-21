@@ -44,26 +44,26 @@ export async function registerControllerRoutes(
   const { db, queue, masterKey } = opts;
 
   app.get('/api/v1/controllers', { preHandler: app.requireAdmin() }, async () => {
-    return { ok: true, data: listControllers(db) };
+    return { ok: true, data: await listControllers(db) };
   });
 
   app.get('/api/v1/controllers/:id', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const { id } = idParamSchema.parse(req.params);
-    const controller = getController(db, id);
+    const controller = await getController(db, id);
     if (!controller) {
       reply.code(404).send({ ok: false, error: 'not_found' });
       return;
     }
-    const sites = listSitesByController(db, id);
+    const sites = await listSitesByController(db, id);
     return { ok: true, data: { ...controller, sites } };
   });
 
   app.post('/api/v1/controllers', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const input = controllerCreateInputSchema.parse(req.body);
-    const id = insertController(db, { input, masterKey });
-    queue.enqueue('collect', { controllerId: id }, undefined, { idempotencyKey: id });
-    const created = getController(db, id);
-    logAudit(db, {
+    const id = await insertController(db, { input, masterKey });
+    await queue.enqueue('collect', { controllerId: id }, undefined, { idempotencyKey: id });
+    const created = await getController(db, id);
+    await logAudit(db, {
       action: 'controller.created',
       target: id,
       metadata: { name: input.name, baseUrl: input.baseUrl, authMode: input.authMode },
@@ -74,29 +74,29 @@ export async function registerControllerRoutes(
   app.patch('/api/v1/controllers/:id', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const { id } = idParamSchema.parse(req.params);
     const patch = updateControllerSchema.parse(req.body);
-    const before = getController(db, id);
+    const before = await getController(db, id);
     if (!before) {
       reply.code(404).send({ ok: false, error: 'not_found' });
       return;
     }
-    const ok = updateController(db, id, patch);
+    const ok = await updateController(db, id, patch);
     if (!ok) {
       reply.code(404).send({ ok: false, error: 'not_found' });
       return;
     }
-    logAudit(db, { action: 'controller.updated', target: id, metadata: patch });
-    return { ok: true, data: getController(db, id) };
+    await logAudit(db, { action: 'controller.updated', target: id, metadata: patch });
+    return { ok: true, data: await getController(db, id) };
   });
 
   app.delete('/api/v1/controllers/:id', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const { id } = idParamSchema.parse(req.params);
-    const before = getController(db, id);
-    const removed = deleteController(db, id);
+    const before = await getController(db, id);
+    const removed = await deleteController(db, id);
     if (!removed) {
       reply.code(404).send({ ok: false, error: 'not_found' });
       return;
     }
-    logAudit(db, {
+    await logAudit(db, {
       action: 'controller.deleted',
       target: id,
       metadata: before ? { name: before.name } : undefined,
@@ -111,12 +111,12 @@ export async function registerControllerRoutes(
     async (req, reply) => {
       const { id } = idParamSchema.parse(req.params);
       const body = backfillBodySchema.parse(req.body ?? {});
-      const controller = getController(db, id);
+      const controller = await getController(db, id);
       if (!controller) {
         reply.code(404).send({ ok: false, error: 'not_found' });
         return;
       }
-      const jobId = queue.enqueue(
+      const jobId = await queue.enqueue(
         'backfill',
         {
           controllerId: id,
@@ -127,7 +127,7 @@ export async function registerControllerRoutes(
         undefined,
         { idempotencyKey: id, maxAttempts: 1 },
       );
-      logAudit(db, {
+      await logAudit(db, {
         action: 'controller.backfill.requested',
         target: id,
         metadata: { days: body.days, intervals: body.intervals, includeDaily: body.includeDaily },
@@ -141,12 +141,12 @@ export async function registerControllerRoutes(
     { preHandler: app.requireAdmin() },
     async (req, reply) => {
       const { id } = idParamSchema.parse(req.params);
-      const controller = getController(db, id);
+      const controller = await getController(db, id);
       if (!controller) {
         reply.code(404).send({ ok: false, error: 'not_found' });
         return;
       }
-      const job = queue.findLatestByKey('backfill', id);
+      const job = await queue.findLatestByKey('backfill', id);
       if (!job) {
         return { ok: true, data: { controllerId: id, job: null } };
       }

@@ -1,5 +1,6 @@
 import type { DB } from '@server/db/client.ts';
 import { BUCKET_1D_SECONDS, BUCKET_1H_SECONDS } from '@shared/constants.ts';
+import { rawRun } from './sql-utils.ts';
 
 /**
  * Rollup time-series 5min → 1h → 1d. Cada chamada agrega um período fixo de
@@ -164,27 +165,32 @@ export interface RollupResult {
  * Roda rollup 5min → 1h para todas as amostras com ts em [fromTs, toTs).
  * Idempotente. Retorna número de linhas afetadas (rough — depende do driver).
  */
-export function rollup5mTo1h(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_5M_TO_1H).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollup5mTo1h(db: DB, fromTs: number, toTs: number): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_5M_TO_1H, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
-export function rollup1hTo1d(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_1H_TO_1D).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollup1hTo1d(db: DB, fromTs: number, toTs: number): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_1H_TO_1D, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
 /**
  * Job de retenção: apaga linhas mais antigas que `now - daysToKeep` da tabela
  * indicada. Retorna número de linhas removidas.
+ *
+ * Nota: no Timescale, o caminho preferido é `add_retention_policy` (configurado
+ * em `runBootstrapSql`). Mantemos esta função como fallback redundante para
+ * o primeiro ciclo de produção, e para tabelas que não são hypertable (ex.
+ * `events` em `purgeEventsOlderThan`).
  */
-export function purgeOlderThan(
+export async function purgeOlderThan(
   db: DB,
   table: 'metrics_5m' | 'metrics_1h' | 'metrics_vap_5m' | 'metrics_vap_1h',
   thresholdTs: number,
-): number {
-  const res = db.$client.prepare(`DELETE FROM ${table} WHERE ts < ?`).run(thresholdTs);
-  return res.changes;
+): Promise<number> {
+  const res = await rawRun(db, `DELETE FROM ${table} WHERE ts < ?`, [thresholdTs]);
+  return res.rowCount;
 }
 
 /* ----------------------- Rollup VAP (SSID × rádio) ----------------------- */
@@ -270,14 +276,22 @@ const SQL_VAP_1H_TO_1D = buildVapRollupSql({
   bucketSeconds: BUCKET_1D_SECONDS,
 });
 
-export function rollupVap5mTo1h(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_VAP_5M_TO_1H).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupVap5mTo1h(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_VAP_5M_TO_1H, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
-export function rollupVap1hTo1d(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_VAP_1H_TO_1D).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupVap1hTo1d(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_VAP_1H_TO_1D, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
 /* ----------------------- Rollup Radio (canal × util) ----------------------- */
@@ -340,14 +354,22 @@ const SQL_RADIO_1H_TO_1D = buildRadioRollupSql({
   bucketSeconds: BUCKET_1D_SECONDS,
 });
 
-export function rollupRadio5mTo1h(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_RADIO_5M_TO_1H).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupRadio5mTo1h(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_RADIO_5M_TO_1H, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
-export function rollupRadio1hTo1d(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_RADIO_1H_TO_1D).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupRadio1hTo1d(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_RADIO_1H_TO_1D, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
 /* ----------------------- Rollup Port (switches) ----------------------- */
@@ -437,14 +459,22 @@ const SQL_PORT_1H_TO_1D = buildPortRollupSql({
   bucketSeconds: BUCKET_1D_SECONDS,
 });
 
-export function rollupPort5mTo1h(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_PORT_5M_TO_1H).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupPort5mTo1h(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_PORT_5M_TO_1H, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
-export function rollupPort1hTo1d(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_PORT_1H_TO_1D).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupPort1hTo1d(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_PORT_1H_TO_1D, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
 /* ----------------------- Rollup Client (cobertura) ----------------------- */
@@ -500,42 +530,50 @@ const SQL_CLIENT_5M_TO_1H = `
     rx_retries = excluded.rx_retries
 `;
 
-export function rollupClient5mTo1h(db: DB, fromTs: number, toTs: number): RollupResult {
-  const res = db.$client.prepare(SQL_CLIENT_5M_TO_1H).run(fromTs, toTs);
-  return { bucketsAffected: res.changes, fromTs, toTs };
+export async function rollupClient5mTo1h(
+  db: DB,
+  fromTs: number,
+  toTs: number,
+): Promise<RollupResult> {
+  const res = await rawRun(db, SQL_CLIENT_5M_TO_1H, [fromTs, toTs]);
+  return { bucketsAffected: res.rowCount, fromTs, toTs };
 }
 
-/* ---- Purgers para novas tabelas ---- */
+/* ---- Purgers para novas tabelas (fallback à retention policy do Timescale) ---- */
 
-export function purgeRadioOlderThan(
+export async function purgeRadioOlderThan(
   db: DB,
   table: 'metrics_radio_5m' | 'metrics_radio_1h',
   thresholdTs: number,
-): number {
-  return db.$client.prepare(`DELETE FROM ${table} WHERE ts < ?`).run(thresholdTs).changes;
+): Promise<number> {
+  const res = await rawRun(db, `DELETE FROM ${table} WHERE ts < ?`, [thresholdTs]);
+  return res.rowCount;
 }
 
-export function purgePortOlderThan(
+export async function purgePortOlderThan(
   db: DB,
   table: 'metrics_port_5m' | 'metrics_port_1h',
   thresholdTs: number,
-): number {
-  return db.$client.prepare(`DELETE FROM ${table} WHERE ts < ?`).run(thresholdTs).changes;
+): Promise<number> {
+  const res = await rawRun(db, `DELETE FROM ${table} WHERE ts < ?`, [thresholdTs]);
+  return res.rowCount;
 }
 
-export function purgeClientOlderThan(
+export async function purgeClientOlderThan(
   db: DB,
   table: 'metrics_client_5m' | 'metrics_client_1h',
   thresholdTs: number,
-): number {
-  return db.$client.prepare(`DELETE FROM ${table} WHERE ts < ?`).run(thresholdTs).changes;
+): Promise<number> {
+  const res = await rawRun(db, `DELETE FROM ${table} WHERE ts < ?`, [thresholdTs]);
+  return res.rowCount;
 }
 
-export function purgeEventsOlderThan(db: DB, thresholdTs: number): number {
-  return db.$client.prepare(`DELETE FROM events WHERE ts < ?`).run(thresholdTs).changes;
+export async function purgeEventsOlderThan(db: DB, thresholdTs: number): Promise<number> {
+  const res = await rawRun(db, `DELETE FROM events WHERE ts < ?`, [thresholdTs]);
+  return res.rowCount;
 }
 
-/** PRAGMA optimize após operações pesadas para SQLite ajustar estatísticas. */
-export function optimize(db: DB): void {
-  db.$client.pragma('optimize');
+/** ANALYZE atualiza estatísticas; em Postgres o autovacuum já cuida disso, mas executar explícito após retenção/rollup grande não machuca. */
+export async function optimize(db: DB): Promise<void> {
+  await db.$pool.query('ANALYZE');
 }

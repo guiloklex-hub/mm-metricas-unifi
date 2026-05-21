@@ -84,19 +84,25 @@ export function clientLabelWithMac(c: ClientLikeBase): string {
  * Carrega os mapas de label de controllers, sites e devices de uma vez só.
  * Reutilizado por exportação CSV/ZIP e geração de PDF.
  */
-export function buildLabelMaps(db: DB, filters: BuildLabelMapsFilters = {}): LabelMaps {
+export async function buildLabelMaps(
+  db: DB,
+  filters: BuildLabelMapsFilters = {},
+): Promise<LabelMaps> {
+  const [controllersRows, sitesRows, devicesRows, clientsRows] = await Promise.all([
+    listControllers(db),
+    listAllSites(db),
+    listAllDevices(db, filters),
+    listAllClients(db, filters),
+  ]);
+
   const controllerName = new Map<string, string>();
-  for (const c of listControllers(db)) {
-    controllerName.set(c.id, c.name);
-  }
+  for (const c of controllersRows) controllerName.set(c.id, c.name);
 
   const siteName = new Map<string, string>();
-  for (const s of listAllSites(db)) {
-    siteName.set(s.id, s.displayName);
-  }
+  for (const s of sitesRows) siteName.set(s.id, s.displayName);
 
   const device = new Map<string, DeviceLabelEntry>();
-  for (const d of listAllDevices(db, filters)) {
+  for (const d of devicesRows) {
     device.set(d.id, {
       label: deviceLabel(d),
       labelWithMac: deviceLabelWithMac(d),
@@ -107,7 +113,7 @@ export function buildLabelMaps(db: DB, filters: BuildLabelMapsFilters = {}): Lab
   }
 
   const clientByMac = new Map<string, ClientLabelEntry>();
-  for (const c of listAllClients(db, filters)) {
+  for (const c of clientsRows) {
     clientByMac.set(c.mac, {
       label: clientLabel(c),
       labelWithMac: clientLabelWithMac(c),

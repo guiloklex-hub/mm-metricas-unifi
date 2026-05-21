@@ -21,7 +21,7 @@ export class UnifiClientPool {
     const existing = this.clients.get(controllerId);
     if (existing) return existing;
 
-    const config = loadControllerConfig(this.db, controllerId, this.masterKey);
+    const config = await loadControllerConfig(this.db, controllerId, this.masterKey);
     if (!config) throw new Error(`controller ${controllerId} não encontrado`);
 
     const client = new UnifiClient(config, this.logger);
@@ -32,7 +32,7 @@ export class UnifiClientPool {
       try {
         await client.ensureReady();
         const detected = client.currentVariant;
-        if (detected) setControllerVariant(this.db, controllerId, detected);
+        if (detected) await setControllerVariant(this.db, controllerId, detected);
       } catch (err) {
         // ensureReady falhou — deixa o config sem variant; próximas tentativas
         // tentarão de novo. Não é fatal para o pool.

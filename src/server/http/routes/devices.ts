@@ -39,18 +39,18 @@ const idParamSchema = z.object({ id: z.string().min(1).max(64) });
 export async function registerDeviceRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/devices', { preHandler: app.requireAdmin() }, async (req) => {
     const filters = listQuerySchema.parse(req.query);
-    return { ok: true, data: listAllDevices(db, filters) };
+    return { ok: true, data: await listAllDevices(db, filters) };
   });
 
   app.put('/api/v1/devices/:id/alias', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const { id } = idParamSchema.parse(req.params);
     const { alias } = aliasBodySchema.parse(req.body);
-    const changes = setDeviceAlias(db, id, alias);
+    const changes = await setDeviceAlias(db, id, alias);
     if (changes === 0) {
       return reply.code(404).send({ ok: false, error: 'device_not_found' });
     }
-    const updated = findDeviceById(db, id);
-    logAudit(db, {
+    const updated = await findDeviceById(db, id);
+    await logAudit(db, {
       action: 'device.alias.updated',
       target: id,
       metadata: { alias: alias ?? null, mac: updated?.mac ?? null },
@@ -71,9 +71,9 @@ export async function registerDeviceRoutes(app: FastifyInstance, db: DB): Promis
           message: `Máximo de ${MAX_CSV_ROWS} linhas por import.`,
         });
       }
-      const result = bulkUpsertAliasesByMac(db, parsed.entries, { controllerId });
+      const result = await bulkUpsertAliasesByMac(db, parsed.entries, { controllerId });
       const allErrors = [...parsed.parseErrors, ...result.errors];
-      logAudit(db, {
+      await logAudit(db, {
         action: 'device.aliases.imported',
         metadata: {
           updated: result.updated,

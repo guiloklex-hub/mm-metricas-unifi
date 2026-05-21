@@ -40,11 +40,11 @@ export async function runRollup1h(
   const currentHour = bucketTs(now, '1h');
   const fromTs = currentHour - lookback * BUCKET_1H_SECONDS;
   const toTs = currentHour; // exclusivo — só agrega horas fechadas
-  const result = rollup5mTo1h(db, fromTs, toTs);
-  const vapResult = rollupVap5mTo1h(db, fromTs, toTs);
-  const radioResult = rollupRadio5mTo1h(db, fromTs, toTs);
-  const portResult = rollupPort5mTo1h(db, fromTs, toTs);
-  const clientResult = rollupClient5mTo1h(db, fromTs, toTs);
+  const result = await rollup5mTo1h(db, fromTs, toTs);
+  const vapResult = await rollupVap5mTo1h(db, fromTs, toTs);
+  const radioResult = await rollupRadio5mTo1h(db, fromTs, toTs);
+  const portResult = await rollupPort5mTo1h(db, fromTs, toTs);
+  const clientResult = await rollupClient5mTo1h(db, fromTs, toTs);
   logger.info(
     {
       fromTs,
@@ -70,10 +70,10 @@ export async function runRollup1d(
   const currentDay = bucketTs(now, '1d');
   const fromTs = currentDay - lookback * BUCKET_1D_SECONDS;
   const toTs = currentDay; // exclusivo
-  const result = rollup1hTo1d(db, fromTs, toTs);
-  const vapResult = rollupVap1hTo1d(db, fromTs, toTs);
-  const radioResult = rollupRadio1hTo1d(db, fromTs, toTs);
-  const portResult = rollupPort1hTo1d(db, fromTs, toTs);
+  const result = await rollup1hTo1d(db, fromTs, toTs);
+  const vapResult = await rollupVap1hTo1d(db, fromTs, toTs);
+  const radioResult = await rollupRadio1hTo1d(db, fromTs, toTs);
+  const portResult = await rollupPort1hTo1d(db, fromTs, toTs);
   logger.info(
     {
       fromTs,

@@ -25,28 +25,35 @@ function sample(ts: number, ssid: string, txBytes: number, rxBytes: number, numS
     avgClientSignal: -60,
     txBytes,
     rxBytes,
+    txPackets: null,
+    rxPackets: null,
+    txRetries: null,
+    txDropped: null,
+    rxDropped: null,
+    ccq: null,
+    satisfaction: null,
     macFilterRejections: 0,
   };
 }
 
 describe('insertVapSamples5m', () => {
   let db: DB;
-  beforeEach(() => {
-    db = createTestDb();
+  beforeEach(async () => {
+    db = await createTestDb();
   });
   afterEach(() => closeTestDb(db));
 
-  it('grava snapshot e calcula deltas por SSID isolados', () => {
+  it('grava snapshot e calcula deltas por SSID isolados', async () => {
     const ts = 1_735_689_600;
     // 1ª amostra: contadores cumulativos iniciais. d_tx_bytes = mesmo valor (sem last).
-    insertVapSamples5m(db, [sample(ts, 'CORP', 1000, 500, 3), sample(ts, 'GUEST', 0, 0, 0)]);
+    await insertVapSamples5m(db, [sample(ts, 'CORP', 1000, 500, 3), sample(ts, 'GUEST', 0, 0, 0)]);
     // 2ª amostra: cresce. d_tx_bytes = diferença.
-    insertVapSamples5m(db, [
+    await insertVapSamples5m(db, [
       sample(ts + 300, 'CORP', 3000, 1500, 5),
       sample(ts + 300, 'GUEST', 100, 50, 2),
     ]);
 
-    const { rows } = queryVapMetrics(db, {
+    const { rows } = await queryVapMetrics(db, {
       from: ts,
       to: ts + 600,
       controllerId: CTRL,

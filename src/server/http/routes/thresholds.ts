@@ -27,13 +27,13 @@ export async function registerThresholdsRoutes(app: FastifyInstance, db: DB): Pr
   app.get('/api/v1/thresholds', { preHandler: app.requireAdmin() }, async () => {
     return {
       ok: true,
-      data: { thresholds: getThresholds(db), defaults: DEFAULT_THRESHOLDS },
+      data: { thresholds: await getThresholds(db), defaults: DEFAULT_THRESHOLDS },
     };
   });
 
   app.put('/api/v1/thresholds', { preHandler: app.requireAdmin() }, async (req) => {
     const parsed = thresholdsSchema.parse(req.body);
-    saveThresholds(db, parsed);
+    await saveThresholds(db, parsed);
     return { ok: true, data: { thresholds: parsed } };
   });
 }

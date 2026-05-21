@@ -1,34 +1,39 @@
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
-import BetterSqlite3 from 'better-sqlite3';
-import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import pg from 'pg';
 import * as schema from './schema.ts';
 
-export type DB = BetterSQLite3Database<typeof schema> & {
-  $client: BetterSqlite3.Database;
+/**
+ * Por default, o driver `pg` retorna `bigint` (OID 20) como string para evitar
+ * estouro de Number. Mas todos os nossos campos `bigint` (epoch seconds,
+ * counters de bytes/packets) cabem confortavelmente em `Number.MAX_SAFE_INTEGER`
+ * (epoch em segundos vai até o ano 285k; counters em bytes podem chegar a
+ * petabytes antes de estourar). Forçar `parseInt` mantém a tipagem `number`
+ * usada em todo o codebase.
+ */
+pg.types.setTypeParser(pg.types.builtins.INT8, (v) => parseInt(v, 10));
+
+export type DB = NodePgDatabase<typeof schema> & {
+  $pool: pg.Pool;
 };
 
 export interface CreateDbOptions {
-  path: string;
-  readonly?: boolean;
+  /** Connection string Postgres (`postgresql://user:pass@host:port/db`). */
+  url: string;
+  /** Tamanho máximo do pool. Default 10. */
+  maxConnections?: number;
+  /** Tempo (ms) que uma conexão pode ficar idle antes de ser fechada. Default 30s. */
+  idleTimeoutMs?: number;
 }
 
-export function createDb({ path, readonly = false }: CreateDbOptions): DB {
-  if (path !== ':memory:') {
-    mkdirSync(dirname(path), { recursive: true });
-  }
-  const sqlite = new BetterSqlite3(path, { readonly, fileMustExist: false });
-  applyPragmas(sqlite);
-  return drizzle(sqlite, { schema, logger: false }) as DB;
-}
-
-function applyPragmas(sqlite: BetterSqlite3.Database): void {
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('synchronous = NORMAL');
-  sqlite.pragma('foreign_keys = ON');
-  sqlite.pragma('busy_timeout = 5000');
-  sqlite.pragma('mmap_size = 268435456'); // 256MB
-  sqlite.pragma('temp_store = MEMORY');
+export function createDb({ url, maxConnections = 10, idleTimeoutMs = 30_000 }: CreateDbOptions): DB {
+  const pool = new pg.Pool({
+    connectionString: url,
+    max: maxConnections,
+    idleTimeoutMillis: idleTimeoutMs,
+  });
+  const db = drizzle(pool, { schema, logger: false }) as unknown as DB;
+  db.$pool = pool;
+  return db;
 }
 
 export { schema };

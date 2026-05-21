@@ -117,7 +117,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       reply.raw.setHeader('cache-control', 'no-store');
       reply.raw.write(UTF8_BOM);
       reply.raw.write(METRIC_CSV_HEADER);
-      const { rows } = queryMetrics(db, { ...q, limit: 1_000_000 });
+      const { rows } = await queryMetrics(db, { ...q, limit: 1_000_000 });
       for (const r of rows) reply.raw.write(metricRowToCsv(r));
       reply.raw.end();
       return;
@@ -132,7 +132,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
 
     // Exatamente 1 nível: CSV puro com cabeçalho legível.
     const level = levels[0] as CsvLevel;
-    const labels = buildLabelMaps(db, {
+    const labels = await buildLabelMaps(db, {
       controllerId: q.controllerId,
       siteId: q.siteId,
     });
@@ -144,12 +144,12 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
     reply.raw.write(UTF8_BOM);
     if (level === 'vap') {
       reply.raw.write(VAP_CSV_HEADER);
-      const { rows } = queryVapMetrics(db, { ...q, limit: 1_000_000 });
+      const { rows } = await queryVapMetrics(db, { ...q, limit: 1_000_000 });
       for (const r of rows) reply.raw.write(vapRowToCsv(r, labels));
     } else {
       reply.raw.write(CSV_HEADER_BY_LEVEL[level]);
       const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
-      const { rows } = queryMetrics(db, {
+      const { rows } = await queryMetrics(db, {
         ...q,
         groupBy: LEVEL_TO_GROUP_BY[level],
         limit: 1_000_000,
@@ -177,7 +177,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
   app.post('/api/v1/reports/pdf', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const q = PDF_BODY.parse(req.body);
     const granularity = chooseGranularity(q.from, q.to);
-    const { rows } = queryMetrics(db, {
+    const { rows } = await queryMetrics(db, {
       from: q.from,
       to: q.to,
       granularity,
@@ -187,16 +187,19 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       limit: 500_000,
     });
 
-    const controllerName = q.controllerId ? getController(db, q.controllerId)?.name : undefined;
+    const controllerName = q.controllerId
+      ? (await getController(db, q.controllerId))?.name
+      : undefined;
     let siteName: string | undefined;
     if (q.siteId) {
-      const site = listAllSites(db).find((s) => s.id === q.siteId);
+      const sites = await listAllSites(db);
+      const site = sites.find((s) => s.id === q.siteId);
       siteName = site?.displayName;
     }
 
     // Mapa de label de devices — agora cobre TODOS os devices (não só quando há
     // siteId no filtro), então o PDF sempre exibe "Nome (MAC)" em vez de ULID.
-    const labels = buildLabelMaps(db, {
+    const labels = await buildLabelMaps(db, {
       controllerId: q.controllerId,
       siteId: q.siteId,
     });
@@ -320,7 +323,7 @@ export async function registerReportRoutes(app: FastifyInstance, db: DB): Promis
       .sort((a, b) => b.totalBytes + b.totalRxBytes - (a.totalBytes + a.totalRxBytes));
 
     // Agrega VAP (SSID × rádio) para a seção "Por SSID" do PDF.
-    const { rows: vapRows } = queryVapMetrics(db, {
+    const { rows: vapRows } = await queryVapMetrics(db, {
       from: q.from,
       to: q.to,
       granularity,
@@ -403,7 +406,7 @@ async function streamZip(
   q: z.infer<typeof CSV_QUERY>,
   levels: CsvLevel[],
 ): Promise<void> {
-  const labels = buildLabelMaps(db, {
+  const labels = await buildLabelMaps(db, {
     controllerId: q.controllerId,
     siteId: q.siteId,
   });
@@ -426,12 +429,12 @@ async function streamZip(
     const chunks: string[] = [UTF8_BOM];
     if (level === 'vap') {
       chunks.push(VAP_CSV_HEADER);
-      const { rows } = queryVapMetrics(db, { ...q, limit: 1_000_000 });
+      const { rows } = await queryVapMetrics(db, { ...q, limit: 1_000_000 });
       for (const r of rows) chunks.push(vapRowToCsv(r, labels));
     } else {
       chunks.push(CSV_HEADER_BY_LEVEL[level]);
       const builder = CSV_ROW_BUILDER_BY_LEVEL[level];
-      const { rows } = queryMetrics(db, {
+      const { rows } = await queryMetrics(db, {
         ...q,
         groupBy: LEVEL_TO_GROUP_BY[level],
         limit: 1_000_000,

@@ -24,7 +24,7 @@ const topTalkersSchema = z
 export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/metrics', { preHandler: app.requireAdmin() }, async (req) => {
     const q = metricsQuerySchema.parse(req.query);
-    const { rows, granularity } = queryMetrics(db, {
+    const { rows, granularity } = await queryMetrics(db, {
       from: q.from,
       to: q.to,
       granularity: q.granularity,
@@ -49,24 +49,28 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
 
   // Estatísticas rápidas do estado do collector — útil para monitoramento.
   app.get('/api/v1/metrics/status', { preHandler: app.requireAdmin() }, async () => {
-    const totals = db.$client
-      .prepare(
-        `SELECT
-           (SELECT COUNT(*) FROM metrics_5m) AS rows5m,
-           (SELECT COUNT(*) FROM metrics_1h) AS rows1h,
-           (SELECT COUNT(*) FROM metrics_1d) AS rows1d,
-           (SELECT MAX(ts) FROM metrics_5m) AS latest5m`,
-      )
-      .get() as { rows5m: number; rows1h: number; rows1d: number; latest5m: number | null };
-    const jobs = db.$client
-      .prepare('SELECT status, COUNT(*) AS c FROM jobs GROUP BY status')
-      .all() as Array<{ status: string; c: number }>;
+    const totalsResult = await db.$pool.query<{
+      rows5m: number;
+      rows1h: number;
+      rows1d: number;
+      latest5m: number | null;
+    }>(
+      `SELECT
+         (SELECT COUNT(*)::bigint FROM metrics_5m) AS "rows5m",
+         (SELECT COUNT(*)::bigint FROM metrics_1h) AS "rows1h",
+         (SELECT COUNT(*)::bigint FROM metrics_1d) AS "rows1d",
+         (SELECT MAX(ts) FROM metrics_5m) AS "latest5m"`,
+    );
+    const totals = totalsResult.rows[0] ?? { rows5m: 0, rows1h: 0, rows1d: 0, latest5m: null };
+    const jobsResult = await db.$pool.query<{ status: string; c: number }>(
+      'SELECT status, COUNT(*)::int AS c FROM jobs GROUP BY status',
+    );
     return {
       ok: true,
       data: {
         rows: { '5m': totals.rows5m, '1h': totals.rows1h, '1d': totals.rows1d },
         latestSample: totals.latest5m,
-        jobs: Object.fromEntries(jobs.map((j) => [j.status, j.c] as const)),
+        jobs: Object.fromEntries(jobsResult.rows.map((j) => [j.status, j.c] as const)),
       },
     };
   });
@@ -88,7 +92,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
     const q = recentSchema.parse(req.query);
     const to = Math.floor(Date.now() / 1000);
     const from = to - q.seconds;
-    const { rows, granularity } = queryMetrics(db, {
+    const { rows, granularity } = await queryMetrics(db, {
       from,
       to,
       controllerId: q.controllerId,
@@ -100,7 +104,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
 
   app.get('/api/v1/metrics/top-talkers', { preHandler: app.requireAdmin() }, async (req) => {
     const q = topTalkersSchema.parse(req.query);
-    const rows = listTopTalkers(db, q);
+    const rows = await listTopTalkers(db, q);
     return { ok: true, data: { from: q.from, to: q.to, rows } };
   });
 
@@ -122,7 +126,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
 
   app.get('/api/v1/metrics/vap', { preHandler: app.requireAdmin() }, async (req) => {
     const q = vapQuerySchema.parse(req.query);
-    const { rows, granularity } = queryVapMetrics(db, q);
+    const { rows, granularity } = await queryVapMetrics(db, q);
     return {
       ok: true,
       data: { granularity, from: q.from, to: q.to, count: rows.length, rows },
@@ -145,7 +149,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
     const q = vapRecentSchema.parse(req.query);
     const to = Math.floor(Date.now() / 1000);
     const from = to - q.seconds;
-    const { rows, granularity } = queryVapMetrics(db, {
+    const { rows, granularity } = await queryVapMetrics(db, {
       from,
       to,
       controllerId: q.controllerId,
@@ -171,7 +175,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
 
   app.get('/api/v1/metrics/radio', { preHandler: app.requireAdmin() }, async (req) => {
     const q = radioQuerySchema.parse(req.query);
-    const { rows, granularity } = queryRadioMetrics(db, q);
+    const { rows, granularity } = await queryRadioMetrics(db, q);
     return { ok: true, data: { granularity, from: q.from, to: q.to, count: rows.length, rows } };
   });
 
@@ -192,7 +196,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
 
   app.get('/api/v1/metrics/port', { preHandler: app.requireAdmin() }, async (req) => {
     const q = portQuerySchema.parse(req.query);
-    const { rows, granularity } = queryPortMetrics(db, q);
+    const { rows, granularity } = await queryPortMetrics(db, q);
     return { ok: true, data: { granularity, from: q.from, to: q.to, count: rows.length, rows } };
   });
 
@@ -213,7 +217,7 @@ export async function registerMetricsRoutes(app: FastifyInstance, db: DB): Promi
 
   app.get('/api/v1/metrics/clients', { preHandler: app.requireAdmin() }, async (req) => {
     const q = clientQuerySchema.parse(req.query);
-    const { rows, granularity } = queryClientMetrics(db, q);
+    const { rows, granularity } = await queryClientMetrics(db, q);
     return { ok: true, data: { granularity, from: q.from, to: q.to, count: rows.length, rows } };
   });
 }

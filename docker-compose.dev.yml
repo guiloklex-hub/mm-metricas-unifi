@@ -1,17 +1,14 @@
 services:
+  timescaledb:
+    # Expõe a porta 5432 ao host APENAS em dev para permitir `psql` local.
+    # Em produção (docker-compose.yml) a porta fica fechada na rede interna.
+    ports:
+      - '127.0.0.1:5432:5432'
+
   metricas-unifi:
     build: .
     container_name: metricas-unifi-dev
     restart: 'no'
-    ports:
-      - '3000:3000'
     environment:
       NODE_ENV: development
-      HOST: 0.0.0.0
-      PORT: 3000
-      DATABASE_PATH: /app/data/app.db
       LOG_LEVEL: debug
-      MASTER_KEY: ${MASTER_KEY}
-      JWT_SECRET: ${JWT_SECRET}
-    volumes:
-      - ./data:/app/data

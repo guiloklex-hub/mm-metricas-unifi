@@ -35,18 +35,18 @@ const idParamSchema = z.object({ id: z.string().min(1).max(64) });
 export async function registerClientRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/clients', { preHandler: app.requireAdmin() }, async (req) => {
     const filters = listQuerySchema.parse(req.query);
-    return { ok: true, data: listAllClients(db, filters) };
+    return { ok: true, data: await listAllClients(db, filters) };
   });
 
   app.put('/api/v1/clients/:id/alias', { preHandler: app.requireAdmin() }, async (req, reply) => {
     const { id } = idParamSchema.parse(req.params);
     const { alias } = aliasBodySchema.parse(req.body);
-    const changes = setClientAlias(db, id, alias);
+    const changes = await setClientAlias(db, id, alias);
     if (changes === 0) {
       return reply.code(404).send({ ok: false, error: 'client_not_found' });
     }
-    const updated = findClientById(db, id);
-    logAudit(db, {
+    const updated = await findClientById(db, id);
+    await logAudit(db, {
       action: 'client.alias.updated',
       target: id,
       metadata: { alias: alias ?? null, mac: updated?.mac ?? null },
@@ -67,9 +67,9 @@ export async function registerClientRoutes(app: FastifyInstance, db: DB): Promis
           message: `Máximo de ${MAX_CSV_ROWS} linhas por import.`,
         });
       }
-      const result = bulkUpsertClientAliasesByMac(db, parsed.entries, { controllerId });
+      const result = await bulkUpsertClientAliasesByMac(db, parsed.entries, { controllerId });
       const allErrors = [...parsed.parseErrors, ...result.errors];
-      logAudit(db, {
+      await logAudit(db, {
         action: 'client.aliases.imported',
         metadata: {
           updated: result.updated,

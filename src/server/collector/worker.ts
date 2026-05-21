@@ -53,7 +53,7 @@ export class Worker {
 
   /** Para uso em testes: roda 1 iteração e retorna. */
   async tickOnce(): Promise<boolean> {
-    const job = this.queue.claimNext(this.lockTtl);
+    const job = await this.queue.claimNext(this.lockTtl);
     if (!job) return false;
     await this.execute(job);
     return true;
@@ -62,7 +62,7 @@ export class Worker {
   private async loop(): Promise<void> {
     while (this.running) {
       try {
-        const job = this.queue.claimNext(this.lockTtl);
+        const job = await this.queue.claimNext(this.lockTtl);
         if (job) {
           await this.execute(job);
           // Pega outro imediatamente se houver fila.
@@ -80,18 +80,18 @@ export class Worker {
     const handler = this.handlers.get(job.kind);
     if (!handler) {
       log.error('nenhum handler registrado para esse kind');
-      this.queue.markFailed(job.id, `no handler for kind=${job.kind}`);
+      await this.queue.markFailed(job.id, `no handler for kind=${job.kind}`);
       return;
     }
     const start = Date.now();
     try {
       await handler(job);
-      this.queue.markDone(job.id);
+      await this.queue.markDone(job.id);
       log.info({ ms: Date.now() - start }, 'job done');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       log.warn({ err: message, ms: Date.now() - start }, 'job falhou');
-      this.queue.markFailed(job.id, message.slice(0, 4000));
+      await this.queue.markFailed(job.id, message.slice(0, 4000));
     }
   }
 }

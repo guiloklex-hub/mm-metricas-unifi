@@ -32,32 +32,38 @@ const portsSchema = filterSchema.extend({
 export async function registerHealthRoutes(app: FastifyInstance, db: DB): Promise<void> {
   app.get('/api/v1/health/summary', { preHandler: app.requireAdmin() }, async (req) => {
     const q = filterSchema.parse(req.query);
-    const summary = computeHealthSummary(db, q);
-    return { ok: true, data: { summary, thresholds: getThresholds(db) } };
+    const [summary, thresholds] = await Promise.all([
+      computeHealthSummary(db, q),
+      getThresholds(db),
+    ]);
+    return { ok: true, data: { summary, thresholds } };
   });
 
   app.get('/api/v1/health/aps', { preHandler: app.requireAdmin() }, async (req) => {
     const q = apHealthSchema.parse(req.query);
-    const rows = listApHealth(db, q);
-    return { ok: true, data: { thresholds: getThresholds(db), rows } };
+    const [rows, thresholds] = await Promise.all([listApHealth(db, q), getThresholds(db)]);
+    return { ok: true, data: { thresholds, rows } };
   });
 
   app.get('/api/v1/health/clients', { preHandler: app.requireAdmin() }, async (req) => {
     const q = coverageSchema.parse(req.query);
-    const rows = listClientCoverage(db, q);
-    const histogram = clientCoverageHistogram(db, q);
-    return { ok: true, data: { thresholds: getThresholds(db), rows, histogram } };
+    const [rows, histogram, thresholds] = await Promise.all([
+      listClientCoverage(db, q),
+      clientCoverageHistogram(db, q),
+      getThresholds(db),
+    ]);
+    return { ok: true, data: { thresholds, rows, histogram } };
   });
 
   app.get('/api/v1/health/switches', { preHandler: app.requireAdmin() }, async (req) => {
     const q = filterSchema.parse(req.query);
-    const summary = listSwitchSummary(db, q);
-    return { ok: true, data: { thresholds: getThresholds(db), rows: summary } };
+    const [summary, thresholds] = await Promise.all([listSwitchSummary(db, q), getThresholds(db)]);
+    return { ok: true, data: { thresholds, rows: summary } };
   });
 
   app.get('/api/v1/health/ports', { preHandler: app.requireAdmin() }, async (req) => {
     const q = portsSchema.parse(req.query);
-    const rows = listProblemPorts(db, q);
-    return { ok: true, data: { thresholds: getThresholds(db), rows } };
+    const [rows, thresholds] = await Promise.all([listProblemPorts(db, q), getThresholds(db)]);
+    return { ok: true, data: { thresholds, rows } };
   });
 }

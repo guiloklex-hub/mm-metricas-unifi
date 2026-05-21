@@ -1,8 +1,9 @@
 import type { DB } from '@server/db/client.ts';
+import { rawAll, rawGet, rawRun } from '@server/db/queries/sql-utils.ts';
 import { ulid } from 'ulid';
 
 /**
- * Fila simples de jobs em SQLite. API mínima:
+ * Fila simples de jobs em Postgres. API mínima:
  *
  *   - enqueue(kind, payload?, runAt?, options?) — insere um job.
  *   - claimNext(lockTtlMs?) — UPDATE atômico que pega o próximo job elegível
@@ -11,9 +12,9 @@ import { ulid } from 'ulid';
  *   - markDone(id) / markFailed(id, err, retryDelayMs?) — encerra com
  *     retry exponencial até `max_attempts`.
  *
- * O claim usa `UPDATE ... RETURNING` que SQLite serializa, e o enqueue com
- * `idempotencyKey` usa `INSERT ... WHERE NOT EXISTS (...)` num único statement,
- * então também não tem TOCTOU.
+ * O claim usa `UPDATE … WHERE id = (SELECT … FOR UPDATE SKIP LOCKED) RETURNING`
+ * que garante atomicidade mesmo com múltiplos workers paralelos. O enqueue com
+ * `idempotencyKey` usa `INSERT … WHERE NOT EXISTS (...)` num único statement.
  */
 
 export type JobKind =
@@ -77,155 +78,156 @@ export interface EnqueueOptions {
 export class JobQueue {
   constructor(private readonly db: DB) {}
 
-  enqueue(
+  async enqueue(
     kind: JobKind,
     payload?: unknown,
     runAt?: number,
     opts: EnqueueOptions = {},
-  ): string | null {
+  ): Promise<string | null> {
     const now = nowMs();
     const at = runAt ?? now;
     const payloadJson = payload === undefined || payload === null ? null : JSON.stringify(payload);
 
-    // Idempotência: usa um INSERT condicional atômico em vez de SELECT + INSERT
-    // separados. SQLite avalia a sub-query e o INSERT no mesmo statement,
-    // fechando a janela de TOCTOU em que dois callers podem inserir o mesmo
-    // job entre o check e o write.
+    // Idempotência: INSERT condicional atômico em vez de SELECT + INSERT.
     if (opts.idempotencyKey !== undefined) {
       const prefix = `${kind}:${opts.idempotencyKey}:`;
       const id = `${prefix}${ulid()}`;
-      const result = this.db.$client
-        .prepare(
-          `INSERT INTO jobs (id, kind, payload_json, run_at, status, attempts, max_attempts, locked_until, last_error, created_at, updated_at)
-           SELECT ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?
-           WHERE NOT EXISTS (
-             SELECT 1 FROM jobs
-             WHERE kind = ? AND id LIKE ? AND status IN ('pending', 'running')
-           )`,
-        )
-        .run(id, kind, payloadJson, at, opts.maxAttempts ?? 5, now, now, kind, `${prefix}%`);
-      if (result.changes > 0) return id;
+      const result = await rawRun(
+        this.db,
+        `INSERT INTO jobs (id, kind, payload_json, run_at, status, attempts, max_attempts, locked_until, last_error, created_at, updated_at)
+         SELECT ?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?
+         WHERE NOT EXISTS (
+           SELECT 1 FROM jobs
+           WHERE kind = ? AND id LIKE ? AND status IN ('pending', 'running')
+         )`,
+        [id, kind, payloadJson, at, opts.maxAttempts ?? 5, now, now, kind, `${prefix}%`],
+      );
+      if (result.rowCount > 0) return id;
       // Outro caller venceu a corrida — devolve o id do job vivo.
-      const existing = this.findActiveByKey(kind, opts.idempotencyKey);
+      const existing = await this.findActiveByKey(kind, opts.idempotencyKey);
       return existing ? existing.id : null;
     }
 
     const id = ulid();
-    this.db.$client
-      .prepare(
-        `INSERT INTO jobs (id, kind, payload_json, run_at, status, attempts, max_attempts, locked_until, last_error, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?)`,
-      )
-      .run(id, kind, payloadJson, at, opts.maxAttempts ?? 5, now, now);
+    await rawRun(
+      this.db,
+      `INSERT INTO jobs (id, kind, payload_json, run_at, status, attempts, max_attempts, locked_until, last_error, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?)`,
+      [id, kind, payloadJson, at, opts.maxAttempts ?? 5, now, now],
+    );
     return id;
   }
 
-  private findActiveByKey(kind: JobKind, key: string): JobRow | undefined {
+  private async findActiveByKey(kind: JobKind, key: string): Promise<JobRow | undefined> {
     const prefix = `${kind}:${key}:`;
-    const raw = this.db.$client
-      .prepare(
-        `SELECT * FROM jobs
-         WHERE kind = ? AND id LIKE ? AND status IN ('pending', 'running')
-         LIMIT 1`,
-      )
-      .get(kind, `${prefix}%`) as JobRowRaw | undefined;
+    const raw = await rawGet<JobRowRaw>(
+      this.db,
+      `SELECT * FROM jobs
+       WHERE kind = ? AND id LIKE ? AND status IN ('pending', 'running')
+       LIMIT 1`,
+      [kind, `${prefix}%`],
+    );
     return raw ? toJobRow(raw) : undefined;
   }
 
   /**
-   * Claim atômico. Pega o próximo job elegível:
+   * Claim atômico com `FOR UPDATE SKIP LOCKED`. Pega o próximo job elegível:
    *   - status='pending' AND run_at <= now
    *   - OU status='running' AND locked_until < now (recovery de worker morto)
    *
    * Marca como running com novo locked_until e incrementa attempts.
+   *
+   * `SKIP LOCKED` é essencial: sem isso, múltiplos workers paralelos podem
+   * tentar reivindicar o mesmo job. Hoje rodamos 1 worker, mas a opção
+   * destrava paralelização futura sem reescrita.
    */
-  claimNext(lockTtlMs = 5 * 60_000): JobRow | null {
+  async claimNext(lockTtlMs = 5 * 60_000): Promise<JobRow | null> {
     const now = nowMs();
     const lockUntil = now + lockTtlMs;
-    const raw = this.db.$client
-      .prepare(
-        `UPDATE jobs
-         SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?
-         WHERE id = (
-           SELECT id FROM jobs
-           WHERE (
-             (status = 'pending' AND run_at <= ?)
-             OR (status = 'running' AND locked_until IS NOT NULL AND locked_until < ?)
-           )
-           ORDER BY run_at, id
-           LIMIT 1
+    const raw = await rawGet<JobRowRaw>(
+      this.db,
+      `UPDATE jobs
+       SET status = 'running', locked_until = ?, attempts = attempts + 1, updated_at = ?
+       WHERE id = (
+         SELECT id FROM jobs
+         WHERE (
+           (status = 'pending' AND run_at <= ?)
+           OR (status = 'running' AND locked_until IS NOT NULL AND locked_until < ?)
          )
-         RETURNING *`,
-      )
-      .get(lockUntil, now, now, now) as JobRowRaw | undefined;
+         ORDER BY run_at, id
+         FOR UPDATE SKIP LOCKED
+         LIMIT 1
+       )
+       RETURNING *`,
+      [lockUntil, now, now, now],
+    );
     return raw ? toJobRow(raw) : null;
   }
 
-  markDone(id: string): void {
+  async markDone(id: string): Promise<void> {
     const now = nowMs();
-    this.db.$client
-      .prepare(
-        `UPDATE jobs SET status = 'done', locked_until = NULL, last_error = NULL, updated_at = ? WHERE id = ?`,
-      )
-      .run(now, id);
+    await rawRun(
+      this.db,
+      `UPDATE jobs SET status = 'done', locked_until = NULL, last_error = NULL, updated_at = ? WHERE id = ?`,
+      [now, id],
+    );
   }
 
-  markFailed(id: string, errMessage: string, retryDelayMs?: number): void {
+  async markFailed(id: string, errMessage: string, retryDelayMs?: number): Promise<void> {
     const now = nowMs();
-    const raw = this.db.$client.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as
-      | JobRowRaw
-      | undefined;
+    const raw = await rawGet<JobRowRaw>(this.db, 'SELECT * FROM jobs WHERE id = ?', [id]);
     if (!raw) return;
     const job = toJobRow(raw);
     if (job.attempts >= job.maxAttempts) {
-      this.db.$client
-        .prepare(
-          `UPDATE jobs SET status = 'failed', locked_until = NULL, last_error = ?, updated_at = ? WHERE id = ?`,
-        )
-        .run(errMessage, now, id);
+      await rawRun(
+        this.db,
+        `UPDATE jobs SET status = 'failed', locked_until = NULL, last_error = ?, updated_at = ? WHERE id = ?`,
+        [errMessage, now, id],
+      );
       return;
     }
     const delay = retryDelayMs ?? expBackoff(job.attempts);
-    this.db.$client
-      .prepare(
-        `UPDATE jobs SET status = 'pending', locked_until = NULL, run_at = ?, last_error = ?, updated_at = ? WHERE id = ?`,
-      )
-      .run(now + delay, errMessage, now, id);
+    await rawRun(
+      this.db,
+      `UPDATE jobs SET status = 'pending', locked_until = NULL, run_at = ?, last_error = ?, updated_at = ? WHERE id = ?`,
+      [now + delay, errMessage, now, id],
+    );
   }
 
-  pruneCompleted(olderThanMs: number): number {
+  async pruneCompleted(olderThanMs: number): Promise<number> {
     const threshold = nowMs() - olderThanMs;
-    const res = this.db.$client
-      .prepare(`DELETE FROM jobs WHERE status IN ('done', 'failed') AND updated_at < ?`)
-      .run(threshold);
-    return res.changes;
+    const res = await rawRun(
+      this.db,
+      `DELETE FROM jobs WHERE status IN ('done', 'failed') AND updated_at < ?`,
+      [threshold],
+    );
+    return res.rowCount;
   }
 
-  getJob(id: string): JobRow | null {
-    const raw = this.db.$client.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as
-      | JobRowRaw
-      | undefined;
+  async getJob(id: string): Promise<JobRow | null> {
+    const raw = await rawGet<JobRowRaw>(this.db, 'SELECT * FROM jobs WHERE id = ?', [id]);
     return raw ? toJobRow(raw) : null;
   }
 
   /** Último job de uma dada `kind` para um `idempotencyKey` (pega o mais recente, qualquer status). */
-  findLatestByKey(kind: JobKind, key: string): JobRow | null {
+  async findLatestByKey(kind: JobKind, key: string): Promise<JobRow | null> {
     const prefix = `${kind}:${key}:`;
-    const raw = this.db.$client
-      .prepare(
-        `SELECT * FROM jobs
-         WHERE kind = ? AND id LIKE ?
-         ORDER BY updated_at DESC
-         LIMIT 1`,
-      )
-      .get(kind, `${prefix}%`) as JobRowRaw | undefined;
+    const raw = await rawGet<JobRowRaw>(
+      this.db,
+      `SELECT * FROM jobs
+       WHERE kind = ? AND id LIKE ?
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [kind, `${prefix}%`],
+    );
     return raw ? toJobRow(raw) : null;
   }
 
-  countByStatus(): Record<JobRow['status'], number> {
-    const rows = this.db.$client
-      .prepare('SELECT status, COUNT(*) AS c FROM jobs GROUP BY status')
-      .all() as Array<{ status: JobRow['status']; c: number }>;
+  async countByStatus(): Promise<Record<JobRow['status'], number>> {
+    const rows = await rawAll<{ status: JobRow['status']; c: number }>(
+      this.db,
+      'SELECT status, COUNT(*)::int AS c FROM jobs GROUP BY status',
+    );
     const out: Record<JobRow['status'], number> = { pending: 0, running: 0, done: 0, failed: 0 };
     for (const r of rows) out[r.status] = r.c;
     return out;
