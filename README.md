@@ -91,10 +91,14 @@ npm run dev:web         # Vite SPA em http://localhost:5173 (proxy para 3002)
 
 Todas as variáveis estão em [`.env.example`](.env.example). Obrigatórias:
 
-- `DATABASE_URL` — connection string Postgres. Em Docker compose, aponta para o serviço `timescaledb` interno. Em bare-metal, aponta para o Postgres real.
+- `DATABASE_URL` — connection string Postgres. Em Docker compose, aponta para o serviço `timescaledb` interno. Em bare-metal, aponta para o Postgres real (socket Unix `?host=/var/run/postgresql` se for no mesmo host; TCP+TLS se for remoto). Envolva o valor em **aspas simples** no `.env` — `&` solto vira background job no bash.
 - `POSTGRES_PASSWORD` — usado pelo docker-compose para criar o role `metricas_app` no Postgres e referenciado em `DATABASE_URL`.
 - `MASTER_KEY` — 32 bytes em base64. Cifra credenciais dos controllers no banco. Trocar invalida senhas guardadas.
 - `JWT_SECRET` — segredo para assinar sessões.
+
+> **Bare metal:** `npm run start` não carrega `.env` sozinho. Suba via `systemd`
+> (`EnvironmentFile=`) ou via PM2 com o [`ecosystem.config.cjs`](ecosystem.config.cjs)
+> incluído na raiz. Detalhes em [docs/deployment.md](docs/deployment.md).
 
 ## Backfill de histórico
 

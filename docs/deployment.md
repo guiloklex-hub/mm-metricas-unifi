@@ -91,19 +91,32 @@ nvm use 22
 # Clone e instale dependências.
 git clone https://github.com/guiloklex-hub/metricas-unifi.git
 cd metricas-unifi
-npm ci --omit=dev
-npm run build
 
-# Configure .env (DATABASE_URL aponta para o Postgres do passo anterior).
+# Build precisa das devDependencies (vite, tailwind, plugins). Instale tudo,
+# builde o front-end e só então pode dropar dev deps.
+npm ci
+npm run build
+npm prune --omit=dev   # opcional: reduz node_modules após o build
+
+# Configure .env (DATABASE_URL aponta para o Postgres do passo anterior;
+# ajuste o host para `127.0.0.1` se o Postgres estiver no mesmo servidor,
+# ou para o FQDN do banco remoto).
 cp .env.example .env
 $EDITOR .env
 
-NODE_ENV=production npm run start
+# ATENÇÃO: o processo lê variáveis de `process.env`; não carrega `.env`
+# automaticamente. Para rodar à mão no shell, exporte antes:
+#   set -a; source .env; set +a
+#   NODE_ENV=production npm run start
+# Em produção, prefira systemd com `EnvironmentFile=` (exemplo abaixo).
 ```
 
-Recomendado: rodar sob `systemd`.
+Recomendado: rodar sob um supervisor que (1) garanta auto-start no boot,
+(2) reinicie em caso de crash e (3) carregue o `.env` para o processo. Há duas
+opções suportadas — **systemd** (padrão em Debian, sem dependência extra) e
+**PM2** (familiar para times que já operam outros serviços Node).
 
-### Exemplo `systemd`
+### Opção 1 — `systemd`
 
 `/etc/systemd/system/metricas-unifi.service`:
 
@@ -135,6 +148,47 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now metricas-unifi
 sudo journalctl -u metricas-unifi -f
 ```
+
+### Opção 2 — PM2
+
+O arquivo [`ecosystem.config.cjs`](../ecosystem.config.cjs) na raiz do repositório
+está pré-configurado para o cenário típico. Ele usa `node --env-file=.env --import tsx`
+(Node ≥ 20.6 carrega `.env` nativamente), `instances: 1` (cluster mode causa
+coleta duplicada — o collector e os cronjobs não são idempotentes entre
+processos) e `max_memory_restart: '500M'`.
+
+```bash
+# Instalar PM2 globalmente (uma vez por servidor).
+npm install -g pm2
+
+# Subir o app.
+cd /opt/metricas-unifi
+chmod 600 .env
+pm2 start ecosystem.config.cjs
+
+# Acompanhar boot/migrations/coleta.
+pm2 logs metricas-unifi
+
+# Persistir entre reboots (PM2 gera um unit do systemd embaixo dos panos).
+pm2 save
+pm2 startup    # imprime um comando — rode-o como root.
+```
+
+Comandos do dia-a-dia:
+
+```bash
+pm2 ls
+pm2 restart metricas-unifi              # reinício rápido
+pm2 restart ecosystem.config.cjs        # reload pegando alterações no .env
+pm2 stop metricas-unifi
+pm2 monit                               # CPU/mem em tempo real
+pm2 logs metricas-unifi --lines 200
+```
+
+> **Por que não cluster mode?** O collector (`startCollector`) mantém estado
+> em memória sobre janelas de coleta e o `croner` agenda cronjobs internos
+> (retention, downsampling). Múltiplas réplicas fariam o mesmo poll N vezes
+> contra os controllers UniFi. Mantenha `instances: 1`.
 
 ## Primeiro acesso
 
@@ -197,7 +251,12 @@ Migrations Drizzle rodam automaticamente no boot. Bootstrap do Timescale
 | Sintoma | Causa provável | Solução |
 |---|---|---|
 | Container `metricas-unifi` reinicia em loop | `MASTER_KEY`/`JWT_SECRET`/`POSTGRES_PASSWORD` vazios | Setar no `.env`. |
-| App falha com `ECONNREFUSED 5432` | Postgres ainda subindo, ou `DATABASE_URL` errada | Verificar `docker compose logs timescaledb` e `depends_on` healthcheck. |
+| `Configuração inválida em variáveis de ambiente: MASTER_KEY/JWT_SECRET: Required` rodando bare metal à mão | `npm run start` direto **não carrega `.env`** (não há dotenv embutido) | Use `set -a; source .env; set +a; npm run start`, ou `node --env-file=.env --import tsx src/server/index.ts`, ou suba via systemd / PM2 (que carregam o `.env`). |
+| `sh: 1: vite: not found` no `npm run build` em bare metal | Instalou só com `--omit=dev`; `vite` é dev-dependency | Rode `npm ci` (sem `--omit=dev`), depois `npm run build`, depois opcionalmente `npm prune --omit=dev`. |
+| App falha com `ECONNREFUSED 5432` | Postgres ainda subindo, `DATABASE_URL` aponta para hostname inexistente (`timescaledb` em deploy bare metal), ou firewall bloqueando | Em Docker: ver `docker compose logs timescaledb`. Em bare metal: trocar host para `127.0.0.1` (ou IP/FQDN real) ou usar socket Unix com `?host=/var/run/postgresql`. |
+| `pg_hba.conf rejects connection for host "X.X.X.X", user "metricas_app", database "metricas_unifi", no encryption` | Falta linha em `pg_hba.conf` que case (TYPE, DATABASE, USER, ADDRESS); ou linha existe mas é `hostssl` enquanto o cliente conectou sem TLS | (a) Confirme que o **USER** nas regras é `metricas_app` (nome do role), **não** `metricas_unifi` (nome do banco). (b) Para conexão sem TLS na rede interna, use `host` em vez de `hostssl`. (c) Para socket Unix, use linha `local`. Aplique com `SELECT pg_reload_conf()`. |
+| `Error: self-signed certificate` (`DEPTH_ZERO_SELF_SIGNED_CERT`) | Postgres com cert autoassinado + cliente `pg` v9 valida cadeia por padrão | (a) **Preferível:** use socket Unix (`?host=/var/run/postgresql`) e contorne TLS. (b) Distribua o `server.crt` para o host da app e use `?sslmode=verify-full&sslrootcert=/caminho/server.crt`. (c) Apenas em rede interna confiável: `?uselibpqcompat=true&sslmode=require` (cifra sem verificar cert). |
+| `DATABASE_URL` perdeu metade do valor (`[1]+ Done DATABASE_URL=...`) | O `&` da query string foi interpretado pelo bash como background job | Envolva o valor inteiro em aspas simples no `.env`: `DATABASE_URL='postgresql://...?a=1&b=2'`. |
 | `relation "metrics_5m" does not exist` | Migrations não rodaram | Conferir logs de boot da app por "migrations aplicadas". |
 | `must be loaded via shared_preload_libraries` | Imagem Postgres errada (sem timescaledb) | Confirmar `image: timescale/timescaledb:latest-pg16` no compose. |
 | Controller fica em "falha de login" | TLS auto-assinado sem flag `insecure_tls` | Ativar o checkbox na UI ou instalar CA válida. |

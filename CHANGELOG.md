@@ -2,6 +2,50 @@
 
 Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versionamento [SemVer](https://semver.org).
 
+## [Unreleased]
+
+### Added
+
+- [`ecosystem.config.cjs`](ecosystem.config.cjs) na raiz do repositório, pré-configurado
+  para PM2 — alternativa a `systemd` para quem já opera outros serviços Node.
+  Usa `node --env-file=.env --import tsx` (Node ≥ 20.6) e força
+  `instances: 1` (cluster mode causaria coleta duplicada).
+- Seção "Opção 2 — PM2" em [docs/deployment.md](docs/deployment.md), com
+  comandos para boot persistente (`pm2 save && pm2 startup`).
+- Cenário híbrido em [docs/timescaledb-debian.md §7](docs/timescaledb-debian.md#7-configurar-pg_hbaconf-autenticação)
+  (`host` para `127.0.0.1`/`::1`) — útil para app + banco no mesmo servidor
+  conectando via TCP loopback sem TLS.
+
+### Fixed
+
+- [docs/deployment.md](docs/deployment.md): ordem dos passos do bare metal
+  estava errada (`npm ci --omit=dev` antes do `npm run build`); como `vite`
+  é dev-dependency, o build falhava com `sh: 1: vite: not found`. Agora o
+  doc instrui `npm ci && npm run build && npm prune --omit=dev`.
+- [docs/deployment.md](docs/deployment.md): adicionada nota explícita de que
+  `npm run start` direto **não carrega** `.env` (não há `dotenv` embutido).
+  Recomendações: `systemd` com `EnvironmentFile=`, PM2 com `--env-file=.env`,
+  ou `set -a; source .env; set +a` no shell.
+
+### Documentation
+
+- Aviso em [docs/timescaledb-debian.md §7](docs/timescaledb-debian.md#7-configurar-pg_hbaconf-autenticação)
+  sobre a coluna USER em `pg_hba.conf` ser o nome do **role** (`metricas_app`),
+  não do banco — armadilha recorrente.
+- Aviso em [docs/timescaledb-debian.md §10](docs/timescaledb-debian.md#10-configurar-database_url-na-app)
+  sobre aspas simples na `DATABASE_URL` (o `&` da query string é interpretado
+  pelo bash como background job e corta a variável).
+- Cenário "cert autoassinado em rede interna" documentado: opções socket
+  Unix (preferível), CA distribuída (`verify-full`) e
+  `uselibpqcompat=true&sslmode=require` (libpq-compat — cifra sem verificar).
+- [.env.example](.env.example) expandido com os 4 cenários típicos de
+  `DATABASE_URL` (Docker, socket Unix local, TCP+TLS verify-full, TCP+TLS
+  libpq-compat).
+- Linhas novas na tabela de troubleshooting de [docs/deployment.md](docs/deployment.md#troubleshooting)
+  e [docs/timescaledb-debian.md §20](docs/timescaledb-debian.md#20-troubleshooting)
+  cobrindo `DEPTH_ZERO_SELF_SIGNED_CERT`, `pg_hba.conf rejects ... no encryption`,
+  USER errado no `pg_hba.conf` e `DATABASE_URL` cortada por `&` no shell.
+
 ## [2.0.0] — Migração para PostgreSQL + TimescaleDB
 
 ### BREAKING CHANGES

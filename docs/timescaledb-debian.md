@@ -192,6 +192,12 @@ sudo -u postgres psql -c 'SELECT pg_reload_conf();'
 Editar `/etc/postgresql/16/main/pg_hba.conf`. Substitua `peer`/`md5` por
 `scram-sha-256` e restrinja por IP/CIDR.
 
+> **Cuidado com a coluna USER.** O `pg_hba.conf` casa por
+> `(TYPE, DATABASE, USER, ADDRESS)`. A coluna USER é o **nome do role**
+> (`metricas_app`), **não** o nome do banco (`metricas_unifi`). Um erro
+> recorrente é repetir `metricas_unifi` em ambas as colunas — aí nenhuma
+> linha casa e a conexão cai no `reject` final.
+
 **Cenário A — banco e app no mesmo host (socket Unix, recomendado):**
 ```
 # TYPE   DATABASE         USER          ADDRESS           METHOD
@@ -204,6 +210,26 @@ local    metricas_unifi   metricas_app                    scram-sha-256
 hostssl     metricas_unifi   metricas_app  10.0.0.0/24          scram-sha-256
 ```
 (substitua `10.0.0.0/24` pelo CIDR ou IP `/32` do host da app)
+
+**Cenário híbrido — app no mesmo host, mas conectando via TCP loopback:**
+```
+# TYPE   DATABASE         USER          ADDRESS              METHOD
+host     metricas_unifi   metricas_app  127.0.0.1/32         scram-sha-256
+host     metricas_unifi   metricas_app  ::1/128              scram-sha-256
+```
+
+> **`host` vs. `hostssl`.** `hostssl` exige TLS — se o cliente conectar sem
+> SSL, Postgres rejeita com `no encryption`. Para tráfego puramente local
+> (`127.0.0.1` / `::1` / socket), use `host`/`local`. Para tráfego entre
+> hosts, prefira `hostssl`.
+
+Fechamento recomendado ao final do arquivo (já bloqueia tudo o que não
+casou):
+```
+# Catch-all: rejeita o restante.
+host    all   all   0.0.0.0/0    reject
+host    all   all   ::/0         reject
+```
 
 Em `postgresql.conf`, garantir:
 ```conf
@@ -289,6 +315,27 @@ DATABASE_URL='postgresql://metricas_app:senha@db.exemplo.com:5432/metricas_unifi
 
 URL-encode caracteres especiais na senha (`@`, `:`, `/`, `?`, `#` etc.). Em
 Python: `urllib.parse.quote(senha)`.
+
+> **Aspas no `.env`.** A `DATABASE_URL` quase sempre contém `&` (separador
+> de query string) e `=` (parte do base64 da senha). Se você `source .env`
+> no bash, o `&` é interpretado como background job (`[1]+ Done ...`) e
+> corta a variável ao meio. **Envolva o valor inteiro em aspas simples:**
+>
+> ```
+> DATABASE_URL='postgresql://metricas_app:SENHA@host:5432/metricas_unifi?sslmode=verify-full&sslrootcert=/etc/ssl/certs/db-ca.crt'
+> ```
+
+**Cert autoassinado em rede interna** — se o Postgres usa um cert autoassinado
+e você ainda não distribuiu a CA, o cliente `pg` (Node) v9 valida cadeia por
+padrão e quebra com `DEPTH_ZERO_SELF_SIGNED_CERT`. Opções:
+
+1. **(Preferível)** Use socket Unix para tráfego local (sem TLS): adicione
+   `?host=/var/run/postgresql` à URL, deixando o host TCP vazio.
+2. **(Produção)** Copie o `server.crt` do Postgres para o host da app e use
+   `?sslmode=verify-full&sslrootcert=/caminho/server.crt`.
+3. **(Apenas rede interna confiável)** `?uselibpqcompat=true&sslmode=require`
+   — cifra o tráfego mas não verifica o cert. Equivale ao comportamento
+   histórico do libpq para `sslmode=require`.
 
 Proteger o `.env`:
 ```bash
@@ -692,7 +739,10 @@ você tem dados históricos críticos.
 | `out of shared memory` em queries com muitos chunks | `max_locks_per_transaction` baixo | Aumente para 256+ em `postgresql.conf` e reinicie. |
 | `relation "metrics_5m" does not exist` | Migrations não rodaram | `npm run db:migrate` no host da app, ou conferir logs de boot da app. |
 | `permission denied for schema public` | Faltaram GRANTs | Conceder USAGE/CREATE (seção 8). |
-| `SSL connection required` | `pg_hba.conf` exige `hostssl` mas cliente usa `host` | Ajuste `sslmode` na URL (`sslmode=require`+). |
+| `pg_hba.conf rejects ... no encryption` | `hostssl` exige TLS, mas cliente conectou sem SSL | Acrescente `sslmode=require` (ou `verify-full`+`sslrootcert`) na `DATABASE_URL`. Para tráfego loopback, troque `hostssl` por `host` no `pg_hba.conf`. |
+| `pg_hba.conf rejects ... database "metricas_unifi"` | Coluna USER em `pg_hba.conf` está com o nome do **banco**, não do **role** | USER deve ser `metricas_app` (role da app), DATABASE deve ser `metricas_unifi`. Veja seção 7. |
+| `Error: self-signed certificate` / `DEPTH_ZERO_SELF_SIGNED_CERT` no Node | Postgres com cert autoassinado + cliente `pg` v9 valida cadeia por padrão | Use socket Unix (`?host=/var/run/postgresql`), ou distribua o cert + `sslmode=verify-full&sslrootcert=...`, ou (rede interna) `?uselibpqcompat=true&sslmode=require`. Veja seção 10. |
+| `DATABASE_URL` cortada após `&` (`[1]+ Done ...`) ao fazer `source .env` | Bash interpretou `&` como background job | Envolva o valor todo em aspas simples no `.env`. Veja seção 10. |
 
 ---
 
