@@ -69,6 +69,8 @@ export interface ControllerPatch {
   enabled?: boolean;
   pollSeconds?: number;
   insecureTls?: boolean;
+  /** `null` re-arma o auto-detect na próxima coleta. */
+  variant?: 'unifi-os' | 'classic' | null;
 }
 
 export function useUpdateController() {

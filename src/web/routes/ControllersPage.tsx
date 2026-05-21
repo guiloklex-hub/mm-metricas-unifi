@@ -41,6 +41,7 @@ export function ControllersPage() {
                 controller={c}
                 onToggle={() => update.mutate({ id: c.id, patch: { enabled: !c.enabled } })}
                 onChangePoll={(pollSeconds) => update.mutate({ id: c.id, patch: { pollSeconds } })}
+                onChangeVariant={(variant) => update.mutate({ id: c.id, patch: { variant } })}
                 onDelete={() => {
                   if (confirm(`Excluir controller "${c.name}"?`)) remove.mutate(c.id);
                 }}
@@ -75,15 +76,18 @@ function ControllerRow({
   controller: c,
   onToggle,
   onChangePoll,
+  onChangeVariant,
   onDelete,
 }: {
   controller: ControllerPublic;
   onToggle: () => void;
   onChangePoll: (pollSeconds: number) => void;
+  onChangeVariant: (variant: 'unifi-os' | 'classic' | null) => void;
   onDelete: () => void;
 }) {
   const [editingPoll, setEditingPoll] = useState(false);
   const [pollDraft, setPollDraft] = useState(c.pollSeconds);
+  const [editingVariant, setEditingVariant] = useState(false);
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -97,7 +101,45 @@ function ControllerRow({
           )}
         </p>
         <p className="truncate text-xs text-slate-500">
-          {c.baseUrl} · {c.variant ?? 'auto-detect'} ·{' '}
+          {c.baseUrl} ·{' '}
+          {editingVariant ? (
+            <>
+              <select
+                aria-label="Variant do controller"
+                defaultValue={c.variant ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = v === '' ? null : (v as 'unifi-os' | 'classic');
+                  onChangeVariant(next);
+                  setEditingVariant(false);
+                }}
+                className="rounded border border-slate-300 px-1 py-0 text-xs dark:border-slate-700 dark:bg-slate-950"
+              >
+                <option value="">auto-detect</option>
+                <option value="classic">classic</option>
+                <option value="unifi-os">unifi-os</option>
+              </select>{' '}
+              <button
+                type="button"
+                onClick={() => setEditingVariant(false)}
+                className="text-slate-500 hover:underline"
+              >
+                cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              {c.variant ?? 'auto-detect'}{' '}
+              <button
+                type="button"
+                onClick={() => setEditingVariant(true)}
+                className="text-slate-500 hover:underline"
+              >
+                editar
+              </button>
+            </>
+          )}
+          {' · '}
           {editingPoll ? (
             <>
               <label htmlFor={`poll-${c.id}`}>poll </label>

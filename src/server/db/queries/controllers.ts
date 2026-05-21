@@ -123,6 +123,12 @@ export interface UpdateControllerPatch {
   enabled?: boolean;
   pollSeconds?: number;
   insecureTls?: boolean;
+  /**
+   * Força um variant específico. `null` limpa o valor para que o `auto-detect`
+   * rode na próxima coleta. Útil quando o auto-detect chega na resposta errada
+   * (raro, mas acontece com controllers atrás de proxy/SSO).
+   */
+  variant?: 'unifi-os' | 'classic' | null;
 }
 
 export async function updateController(
@@ -135,6 +141,7 @@ export async function updateController(
   if (patch.enabled !== undefined) sets.enabled = patch.enabled;
   if (patch.pollSeconds !== undefined) sets.pollSeconds = patch.pollSeconds;
   if (patch.insecureTls !== undefined) sets.insecureTls = patch.insecureTls;
+  if (patch.variant !== undefined) sets.variant = patch.variant;
   const res = await db.update(controllers).set(sets).where(eq(controllers.id, id));
   return (res.rowCount ?? 0) > 0;
 }

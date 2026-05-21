@@ -35,7 +35,13 @@ export class UnifiClientError extends Error {
  * Timeouts globais para qualquer request ao controller. Evita coletas travadas
  * em sockets meio-abertos (cenário comum quando o controller passa por um
  * tunnel/proxy ou está parcialmente saudável).
+ *
+ * `CONNECT_TIMEOUT_MS` cobre TCP + TLS handshake. O default do undici é
+ * 10s — pequeno demais para controllers atrás de VPN/tunnel com latência
+ * alta ou que demoram a negociar TLS (cert antigo, RSA-2048 puro etc.).
+ * 30s casa com o que vimos em campo sem mascarar problemas reais.
  */
+const HTTP_CONNECT_TIMEOUT_MS = 30_000;
 const HTTP_HEADERS_TIMEOUT_MS = 20_000;
 const HTTP_BODY_TIMEOUT_MS = 30_000;
 
@@ -69,7 +75,12 @@ export class UnifiClient {
   ) {
     this.variant = config.variant;
     this.dispatcher = new Agent({
-      connect: { rejectUnauthorized: !config.insecureTls },
+      connect: {
+        rejectUnauthorized: !config.insecureTls,
+        timeout: HTTP_CONNECT_TIMEOUT_MS,
+      },
+      headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
+      bodyTimeout: HTTP_BODY_TIMEOUT_MS,
     });
     this.logger = logger.child({ controllerId: config.id, baseUrl: config.baseUrl });
   }

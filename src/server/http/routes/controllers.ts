@@ -20,6 +20,8 @@ const updateControllerSchema = z.object({
   enabled: z.boolean().optional(),
   pollSeconds: z.number().int().min(60).max(3600).optional(),
   insecureTls: z.boolean().optional(),
+  // `null` re-arma o auto-detect na próxima coleta.
+  variant: z.enum(['unifi-os', 'classic']).nullable().optional(),
 });
 
 const backfillBodySchema = z.object({

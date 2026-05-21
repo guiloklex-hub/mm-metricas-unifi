@@ -20,6 +20,11 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
   SKIP LOCKED`), sem duplicar jobs. Recomendado subir para 3–5 quando há
   10+ controllers ou alguns com timeout intermitente — evita que uma
   falha de 10s atrase os demais.
+- **Edição de `variant` na UI/API:** o PATCH `/api/v1/controllers/:id`
+  agora aceita `variant: 'unifi-os' | 'classic' | null` (`null` re-arma
+  o auto-detect). A tela `/controllers` ganhou dropdown inline ao lado
+  do baseUrl. Útil quando o auto-detect chega na resposta errada (raro,
+  mas acontece com controllers atrás de proxy/SSO).
 
 ### Fixed
 
@@ -49,6 +54,12 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
   `client_mac`; corrigido para `(controller_id, site_id, client_mac)` em
   [src/server/db/queries/health.ts](src/server/db/queries/health.ts).
   Coerente com o índice único de `metrics_client_5m`.
+- **`Connect Timeout Error (timeout: 10000ms)` em controllers via VPN/
+  tunnel com TLS lento.** O `Agent` undici usava `connect.timeout`
+  default (10s), que cobre TCP **e** TLS handshake. Aumentado para 30s
+  via `HTTP_CONNECT_TIMEOUT_MS` em
+  [src/server/unifi/client.ts](src/server/unifi/client.ts). 30s é
+  defensivo sem mascarar problemas reais.
 
 ### Changed
 
