@@ -301,10 +301,19 @@ function ControllerForm({
   const [apiKey, setApiKey] = useState('');
   const [insecureTls, setInsecureTls] = useState(false);
   const [pollSeconds, setPollSeconds] = useState(300);
+  const [variant, setVariant] = useState<'auto' | 'classic' | 'unifi-os'>('auto');
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const common = { name, baseUrl, insecureTls, pollSeconds, enabled: true };
+    const variantValue = variant === 'auto' ? null : variant;
+    const common = {
+      name,
+      baseUrl,
+      insecureTls,
+      pollSeconds,
+      enabled: true,
+      variant: variantValue,
+    };
     if (authMode === 'local') {
       onSubmit({ ...common, authMode: 'local', username, password });
     } else {
@@ -393,15 +402,37 @@ function ControllerForm({
           onChange={(e) => setPollSeconds(Number(e.target.value))}
           required
         />
-        <label className="mt-6 inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={insecureTls}
-            onChange={(e) => setInsecureTls(e.target.checked)}
-          />
-          Aceitar certificado TLS auto-assinado (UDM/UCK padrão)
-        </label>
+        <div>
+          <label
+            htmlFor="controller-variant"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
+            Variant
+          </label>
+          <select
+            id="controller-variant"
+            value={variant}
+            onChange={(e) => setVariant(e.target.value as 'auto' | 'classic' | 'unifi-os')}
+            className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-950"
+          >
+            <option value="auto">auto-detect (recomendado)</option>
+            <option value="classic">classic — Network App self-hosted (porta 8443)</option>
+            <option value="unifi-os">unifi-os — UDM/UCK/Cloud Key Gen2+ (porta 443)</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-500">
+            Force quando o auto-detect falhar (raro, ocorre atrás de proxy/SSO).
+          </p>
+        </div>
       </div>
+
+      <label className="inline-flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={insecureTls}
+          onChange={(e) => setInsecureTls(e.target.checked)}
+        />
+        Aceitar certificado TLS auto-assinado (UDM/UCK padrão)
+      </label>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 

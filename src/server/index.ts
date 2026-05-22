@@ -37,6 +37,7 @@ async function main(): Promise<void> {
   const app = await buildApp({
     db,
     queue: collector.queue,
+    pool: collector.pool,
     logger,
     jwtSecret: env.JWT_SECRET,
     masterKey: env.MASTER_KEY,

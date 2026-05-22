@@ -23,8 +23,15 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
 - **Edição de `variant` na UI/API:** o PATCH `/api/v1/controllers/:id`
   agora aceita `variant: 'unifi-os' | 'classic' | null` (`null` re-arma
   o auto-detect). A tela `/controllers` ganhou dropdown inline ao lado
-  do baseUrl. Útil quando o auto-detect chega na resposta errada (raro,
-  mas acontece com controllers atrás de proxy/SSO).
+  do baseUrl. O formulário de **criação** (Adicionar controller) ganhou
+  o mesmo dropdown com 3 opções (`auto-detect` é o default). Útil quando
+  o auto-detect chega na resposta errada (raro, mas acontece com
+  controllers atrás de proxy/SSO).
+- **PATCH invalida UnifiClientPool quando muda `variant`/`insecureTls`:**
+  antes, mesmo trocando variant no banco, a app continuava usando a
+  instância antiga em memória (com cookie/csrf/variant do último login).
+  Agora o PATCH chama `pool.evict(id)` e re-enfileira `collect` para
+  validar a mudança imediatamente.
 
 ### Fixed
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import type { UnifiClientPool } from '@server/collector/clients-pool.ts';
 import type { JobQueue } from '@server/collector/queue.ts';
 import type { DB } from '@server/db/client.ts';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
@@ -27,6 +28,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export interface BuildAppOptions {
   db: DB;
   queue: JobQueue;
+  pool: UnifiClientPool;
   logger: FastifyBaseLogger;
   jwtSecret: string;
   masterKey: string;
@@ -64,6 +66,7 @@ export async function buildApp(opts: BuildAppOptions): Promise<FastifyInstance> 
   await registerControllerRoutes(app, {
     db: opts.db,
     queue: opts.queue,
+    pool: opts.pool,
     masterKey: opts.masterKey,
   });
   await registerSiteRoutes(app, opts.db);

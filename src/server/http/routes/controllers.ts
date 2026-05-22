@@ -1,3 +1,4 @@
+import type { UnifiClientPool } from '@server/collector/clients-pool.ts';
 import type { JobQueue } from '@server/collector/queue.ts';
 import type { DB } from '@server/db/client.ts';
 import { logAudit } from '@server/db/queries/audit.ts';
@@ -36,6 +37,7 @@ const backfillBodySchema = z.object({
 export interface RegisterControllerRoutesOptions {
   db: DB;
   queue: JobQueue;
+  pool: UnifiClientPool;
   masterKey: string;
 }
 
@@ -43,7 +45,7 @@ export async function registerControllerRoutes(
   app: FastifyInstance,
   opts: RegisterControllerRoutesOptions,
 ): Promise<void> {
-  const { db, queue, masterKey } = opts;
+  const { db, queue, pool, masterKey } = opts;
 
   app.get('/api/v1/controllers', { preHandler: app.requireAdmin() }, async () => {
     return { ok: true, data: await listControllers(db) };
@@ -86,6 +88,17 @@ export async function registerControllerRoutes(
       reply.code(404).send({ ok: false, error: 'not_found' });
       return;
     }
+
+    // Configurações que afetam o cliente UniFi em memória (variant, TLS) exigem
+    // descartar a instância cacheada — senão o pool continua usando o variant
+    // antigo e o usuário não vê efeito até reiniciar o processo. Reagenda
+    // coleta imediata para validar a mudança.
+    const invalidatesClient = patch.variant !== undefined || patch.insecureTls !== undefined;
+    if (invalidatesClient) {
+      await pool.evict(id);
+      await queue.enqueue('collect', { controllerId: id }, undefined, { idempotencyKey: id });
+    }
+
     await logAudit(db, { action: 'controller.updated', target: id, metadata: patch });
     return { ok: true, data: await getController(db, id) };
   });
