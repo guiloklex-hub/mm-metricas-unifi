@@ -67,6 +67,17 @@ Todas as mudanças notáveis aqui. Formato [Keep a Changelog](https://keepachang
   via `HTTP_CONNECT_TIMEOUT_MS` em
   [src/server/unifi/client.ts](src/server/unifi/client.ts). 30s é
   defensivo sem mascarar problemas reais.
+- **`Client network socket disconnected before secure TLS connection
+  was established` (ECONNRESET no handshake).** Vários controllers
+  UniFi com firmware antigo (especialmente Network App classic
+  self-hosted) resetam o socket silenciosamente ao receber um
+  ClientHello TLS 1.3, sem enviar o alert `protocol_version`. O Node
+  22 default tenta 1.3 primeiro. Forçado `minVersion`/`maxVersion =
+  'TLSv1.2'` no `Agent` undici em
+  [src/server/unifi/client.ts](src/server/unifi/client.ts). TLS 1.2 é
+  universal nesse setor e o overhead de 1 RTT extra é desprezível para
+  um poll a cada 5min. Confirmado em campo: controller que dava
+  ECONNRESET em todos os endpoints passou a responder 302 normalmente.
 
 ### Changed
 

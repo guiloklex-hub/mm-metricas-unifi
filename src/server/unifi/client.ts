@@ -78,6 +78,15 @@ export class UnifiClient {
       connect: {
         rejectUnauthorized: !config.insecureTls,
         timeout: HTTP_CONNECT_TIMEOUT_MS,
+        // Força TLS 1.2 como teto. Vários controllers UniFi (firmware
+        // antigo / instalações classic auto-hospedadas) **resetam o socket
+        // silenciosamente** quando recebem um ClientHello TLS 1.3, sem
+        // mandar o alert `protocol_version`. O Node 22 default tenta 1.3
+        // primeiro — daí o ECONNRESET ("socket disconnected before secure
+        // TLS connection was established"). 1.2 é universal nos UniFi e
+        // o overhead de 1 RTT extra é irrelevante para um poll a cada 5min.
+        maxVersion: 'TLSv1.2',
+        minVersion: 'TLSv1.2',
       },
       headersTimeout: HTTP_HEADERS_TIMEOUT_MS,
       bodyTimeout: HTTP_BODY_TIMEOUT_MS,
